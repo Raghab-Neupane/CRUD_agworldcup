@@ -1,0 +1,554 @@
+<template>
+  <div class="admin-dashboard">
+    <!-- Loading Overlay -->
+    <div v-if="loading" class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Processing Request...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container">
+      <TransitionGroup name="toast">
+        <div
+          v-for="toast in toasts"
+          :key="toast.id"
+          class="toast"
+          :class="'toast-' + toast.type"
+        >
+          <span class="toast-icon">{{ toast.type === 'success' ? '✓' : '⚠️' }}</span>
+          <span class="toast-message">{{ toast.message }}</span>
+          <button class="toast-close" @click="removeToast(toast.id)">&times;</button>
+        </div>
+      </TransitionGroup>
+    </div>
+
+    <!-- Header Section -->
+    <header class="dashboard-header">
+      <div class="header-left">
+        <h1 class="page-title">World Cup Dashboard</h1>
+        <p class="subtitle">Admin panel for managing matches, live states, and tournament outcomes</p>
+      </div>
+      <div class="header-right">
+        <button class="btn-primary" @click="showAddModal = true">
+          Add New Match
+        </button>
+        <button class="btn-refresh" @click="fetchMatches" :disabled="loading" title="Refresh match data">
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="dashboard-content">
+      <!-- Status Tabs / Filter Pills -->
+      <div class="filter-tabs-container">
+        <div class="tabs-list">
+          <button
+            v-for="tab in filterTabs"
+            :key="tab.value"
+            class="tab-pill"
+            :class="{ active: activeStatusFilter === tab.value }"
+            @click="activeStatusFilter = tab.value"
+          >
+            {{ tab.label }}
+            <span class="tab-count">{{ tab.count }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Match Visual Dashboard Grid -->
+      <section class="content-main">
+        <MatchTable
+          :matches="matches"
+          :active-status-filter="activeStatusFilter"
+          @request-delete="triggerDeleteConfirmation"
+          @update-status="handleUpdateStatus"
+          @update-result="handleUpdateResult"
+          @update-match="handleUpdateMatch"
+        />
+      </section>
+    </main>
+
+    <!-- Add Match Modal -->
+    <AddMatchModal
+      :show="showAddModal"
+      :loading="modalActionLoading"
+      @confirm="handleConfirmAdd"
+      @bulk-confirm="handleConfirmBulkAdd"
+      @cancel="showAddModal = false"
+    />
+
+    <!-- Confirmation Modal for Deletion -->
+    <ConfirmDeleteModal
+      :show="showDeleteModal"
+      :match-no="matchToDelete"
+      @confirm="handleConfirmDelete"
+      @cancel="closeDeleteModal"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue';
+import matchService from '../services/matchService';
+import AddMatchModal from '../components/AddMatchModal.vue';
+import MatchTable from '../components/MatchTable.vue';
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
+
+// State variables
+const matches = ref([]);
+const loading = ref(false);
+const modalActionLoading = ref(false);
+const toasts = ref([]);
+const activeStatusFilter = ref('all');
+
+// Modals State
+const showAddModal = ref(false);
+const showDeleteModal = ref(false);
+const matchToDelete = ref(null);
+
+let toastIdCounter = 0;
+
+// Toast helper
+const addToast = (message, type = 'success') => {
+  const id = ++toastIdCounter;
+  toasts.value.push({ id, message, type });
+  setTimeout(() => {
+    removeToast(id);
+  }, 4500);
+};
+
+const removeToast = (id) => {
+  toasts.value = toasts.value.filter((t) => t.id !== id);
+};
+
+// Count computations
+const upcomingCount = computed(() => matches.value.filter(m => m.status === 'upcoming').length);
+const completedCount = computed(() => matches.value.filter(m => m.status === 'completed').length);
+
+// Status filter tabs definitions
+const filterTabs = computed(() => [
+  { label: 'All Matches', value: 'all', count: matches.value.length },
+  { label: 'Upcoming', value: 'upcoming', count: upcomingCount.value },
+  { label: 'Completed', value: 'completed', count: completedCount.value }
+]);
+
+// API operations
+const fetchMatches = async () => {
+  loading.value = true;
+  try {
+    matches.value = await matchService.getMatches();
+  } catch (error) {
+    const errorMsg = error.response?.data?.detail || error.message || 'Failed to fetch matches';
+    addToast(errorMsg, 'error');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleConfirmAdd = async (newMatchData) => {
+  modalActionLoading.value = true;
+  try {
+    const createdMatch = await matchService.addMatch(newMatchData);
+    matches.value.push(createdMatch);
+    showAddModal.value = false;
+    addToast('Match added successfully!', 'success');
+  } catch (error) {
+    const errorMsg = error.response?.data?.detail || error.message || 'Failed to add match';
+    addToast(errorMsg, 'error');
+  } finally {
+    modalActionLoading.value = false;
+  }
+};
+
+const handleConfirmBulkAdd = async (matchesList) => {
+  modalActionLoading.value = true;
+  let insertedCount = 0;
+  let failedCount = 0;
+  let lastError = '';
+
+  for (const newMatchData of matchesList) {
+    try {
+      await matchService.addMatch(newMatchData);
+      insertedCount++;
+    } catch (error) {
+      failedCount++;
+      lastError = error.response?.data?.detail || error.message || 'Duplicate or invalid record';
+    }
+  }
+
+  showAddModal.value = false;
+  modalActionLoading.value = false;
+  
+  if (insertedCount > 0) {
+    addToast(`Successfully bulk inserted ${insertedCount} matches!`, 'success');
+  }
+  if (failedCount > 0) {
+    addToast(`Failed to insert ${failedCount} matches. Error: ${lastError}`, 'error');
+  }
+  
+  await fetchMatches();
+};
+
+const handleUpdateStatus = async ({ matchNo, status }) => {
+  loading.value = true;
+  try {
+    const updatedMatch = await matchService.updateMatchStatus(matchNo, status);
+    const index = matches.value.findIndex(m => m.match_no === matchNo);
+    if (index !== -1) {
+      matches.value[index] = updatedMatch;
+    }
+    addToast(`Match #${matchNo} status updated to ${status.toUpperCase()}!`, 'success');
+  } catch (error) {
+    const errorMsg = error.response?.data?.detail || error.message || 'Failed to update status';
+    addToast(errorMsg, 'error');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleUpdateResult = async ({ matchNo, result }) => {
+  loading.value = true;
+  try {
+    const updatedMatch = await matchService.updateMatchResult(matchNo, result);
+    const index = matches.value.findIndex(m => m.match_no === matchNo);
+    if (index !== -1) {
+      matches.value[index] = updatedMatch;
+    }
+    addToast(`Match #${matchNo} result updated to ${result || 'None'}!`, 'success');
+  } catch (error) {
+    const errorMsg = error.response?.data?.detail || error.message || 'Failed to update result';
+    addToast(errorMsg, 'error');
+  } finally {
+    loading.value = false;
+  }
+};
+
+
+
+const handleUpdateMatch = async ({ matchNo, updatedData }) => {
+  loading.value = true;
+  try {
+    const updatedMatch = await matchService.updateMatch(matchNo, updatedData);
+    const index = matches.value.findIndex(m => m.match_no === matchNo);
+    if (index !== -1) {
+      matches.value[index] = updatedMatch;
+    }
+    addToast(`Match #${matchNo} details updated successfully!`, 'success');
+  } catch (error) {
+    const errorMsg = error.response?.data?.detail || error.message || 'Failed to update match details';
+    addToast(errorMsg, 'error');
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Delete actions
+const triggerDeleteConfirmation = (matchNo) => {
+  matchToDelete.value = matchNo;
+  showDeleteModal.value = true;
+};
+
+const closeDeleteModal = () => {
+  showDeleteModal.value = false;
+  matchToDelete.value = null;
+};
+
+const handleConfirmDelete = async () => {
+  if (matchToDelete.value === null) return;
+  const matchNo = matchToDelete.value;
+  closeDeleteModal();
+  loading.value = true;
+  try {
+    const response = await matchService.deleteMatch(matchNo);
+    matches.value = matches.value.filter(m => m.match_no !== response.match_no);
+    addToast(`Match #${matchNo} deleted successfully`, 'success');
+  } catch (error) {
+    const errorMsg = error.response?.data?.detail || error.message || 'Failed to delete match';
+    addToast(errorMsg, 'error');
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchMatches();
+});
+</script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #f8fafc;
+  color: #1e293b;
+  font-family: 'Outfit', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+.admin-dashboard {
+  min-height: 100vh;
+  padding: 30px;
+  max-width: 95%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Header */
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 20px;
+}
+
+.page-title {
+  margin: 0 0 4px 0;
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.subtitle {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-primary {
+  background: #1976d2; /* Quasar Blue primary color */
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background: #1565c0;
+}
+
+.btn-refresh {
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.btn-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Main Dashboard content */
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Filter pills list */
+.filter-tabs-container {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.tabs-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tab-pill {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.tab-pill:hover {
+  color: #1e293b;
+  background: #f1f5f9;
+}
+
+.tab-pill.active {
+  background: rgba(25, 118, 210, 0.1);
+  color: #1976d2;
+}
+
+.tab-count {
+  font-size: 0.75rem;
+  background: #e2e8f0;
+  color: #475569;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.tab-pill.active .tab-count {
+  background: rgba(25, 118, 210, 0.2);
+  color: #1976d2;
+}
+
+/* Loading overlay spinner */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(2px);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  color: #1e293b;
+}
+
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #1976d2;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Toast Notification Styles */
+.toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 360px;
+  width: 100%;
+}
+
+.toast {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid #1976d2;
+  border-radius: 8px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #1e293b;
+  font-size: 0.88rem;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.toast-success {
+  border-left-color: #2e7d32;
+}
+
+.toast-error {
+  border-left-color: #d32f2f;
+}
+
+.toast-icon {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.toast-success .toast-icon {
+  color: #2e7d32;
+}
+
+.toast-error .toast-icon {
+  color: #d32f2f;
+}
+
+.toast-message {
+  flex-grow: 1;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 1.3rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.toast-close:hover {
+  color: #475569;
+}
+
+/* Toast Transitions */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-enter-from {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+}
+
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(100px);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
