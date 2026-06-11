@@ -76,8 +76,8 @@ export default {
    * Get the selected match.
    * GET /matches/selectedmatch/{match_no}
    */
-  async getSelectedMatch(matchNo) {
-    const response = await apiClient.get(`/matches/selectedmatch/${matchNo}`);
+  async getSelectedMatch() {
+    const response = await apiClient.get(`/matches/selectedmatch`);
     return response.data;
   },
 

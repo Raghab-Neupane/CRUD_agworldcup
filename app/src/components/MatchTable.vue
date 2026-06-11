@@ -328,6 +328,9 @@ const saveRow = (match) => {
   border-radius: 4px;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2), 0 2px 2px rgba(0, 0, 0, 0.14), 0 3px 1px -2px rgba(0, 0, 0, 0.12);
   overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Table Controls Top Bar */
@@ -335,10 +338,10 @@ const saveRow = (match) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 8px 12px;
   border-bottom: 1px solid #e0e0e0;
   background: #ffffff;
-  gap: 16px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -430,9 +433,8 @@ const saveRow = (match) => {
 }
 
 .q-table th {
-  padding: 16px 20px;
-  /* Extended spacing */
-  font-size: 0.78rem;
+  padding: 8px 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   color: #616161;
@@ -442,9 +444,8 @@ const saveRow = (match) => {
 }
 
 .q-table td {
-  padding: 18px 20px;
-  /* Extended vertical spacing */
-  font-size: 0.9rem;
+  padding: 10px 12px;
+  font-size: 0.85rem;
   color: #212121;
   border-bottom: 1px solid #eeeeee;
   background: #ffffff;
@@ -695,11 +696,11 @@ const saveRow = (match) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 8px 12px;
   border-top: 1px solid #e0e0e0;
   background: #ffffff;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 
 .footer-info {
@@ -734,14 +735,14 @@ const saveRow = (match) => {
   background: #ffffff;
   border: 1px solid #bdbdbd;
   color: #424242;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   transition: all 0.2s;
 }
 
@@ -759,5 +760,19 @@ const saveRow = (match) => {
   font-size: 0.8rem;
   color: #757575;
   padding: 0 4px;
+}
+@media (max-width: 600px) {
+  .table-top-bar, .q-table-footer {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .q-table th, .q-table td {
+    padding: 6px 8px;
+    font-size: 0.75rem;
+  }
+  .q-input, .q-select, .q-per-page {
+    width: 100%;
+    max-width: 150px;
+  }
 }
 </style>

@@ -3,6 +3,5 @@
 </template>
 
 <script setup>
-import MatchManagement from '../src/views/MatchManagement.vue';
+import MatchManagement from './src/views/MatchManagement.vue';
 </script>
-
