@@ -51,16 +51,24 @@
             </td>
 
             <!-- Team 1 column -->
-            <td class="text-left text-bold">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.team1" type="text" class="q-edit-input"
-                required />
+            <td class="text-left text-bold dropdown-container">
+              <template v-if="editingMatchNo === match.match_no">
+                <input v-model="editForm.team1" @focus="focusTeam1 = true" @blur="onBlurTeam1" type="text" class="q-edit-input" required autocomplete="off" />
+                <ul class="q-menu" v-if="focusTeam1 && filteredTeam1.length">
+                  <li v-for="c in filteredTeam1" :key="c" @mousedown="selectTeam1(c)">{{ c }}</li>
+                </ul>
+              </template>
               <span v-else>{{ match.team1 }}</span>
             </td>
 
             <!-- Team 2 column -->
-            <td class="text-left text-bold">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.team2" type="text" class="q-edit-input"
-                required />
+            <td class="text-left text-bold dropdown-container">
+              <template v-if="editingMatchNo === match.match_no">
+                <input v-model="editForm.team2" @focus="focusTeam2 = true" @blur="onBlurTeam2" type="text" class="q-edit-input" required autocomplete="off" />
+                <ul class="q-menu" v-if="focusTeam2 && filteredTeam2.length">
+                  <li v-for="c in filteredTeam2" :key="c" @mousedown="selectTeam2(c)">{{ c }}</li>
+                </ul>
+              </template>
               <span v-else>{{ match.team2 }}</span>
             </td>
 
@@ -150,6 +158,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import matchService from '../services/matchService';
+import countries from '../data/countries.json';
 
 
 const props = defineProps({
@@ -203,6 +212,38 @@ const editForm = ref({
   phone: '',
   winner: ''
 });
+
+// Dropdown states for inline editing
+const focusTeam1 = ref(false);
+const focusTeam2 = ref(false);
+
+const filteredTeam1 = computed(() => {
+  const query = (editForm.value.team1 || '').toLowerCase();
+  return countries.filter(c => c.toLowerCase().includes(query));
+});
+
+const filteredTeam2 = computed(() => {
+  const query = (editForm.value.team2 || '').toLowerCase();
+  return countries.filter(c => c.toLowerCase().includes(query));
+});
+
+const onBlurTeam1 = () => {
+  setTimeout(() => { focusTeam1.value = false; }, 150);
+};
+
+const onBlurTeam2 = () => {
+  setTimeout(() => { focusTeam2.value = false; }, 150);
+};
+
+const selectTeam1 = (c) => {
+  editForm.value.team1 = c;
+  focusTeam1.value = false;
+};
+
+const selectTeam2 = (c) => {
+  editForm.value.team2 = c;
+  focusTeam2.value = false;
+};
 
 
 
@@ -300,6 +341,16 @@ const cancelEditing = () => {
 };
 
 const saveRow = (match) => {
+  // Check if team1 and team2 are valid countries
+  if (!countries.includes(editForm.value.team1) || !countries.includes(editForm.value.team2)) {
+    alert("Both teams must be valid countries from the suggestions.");
+    return;
+  }
+  if (editForm.value.team1.trim().toLowerCase() === editForm.value.team2.trim().toLowerCase()) {
+    alert("Team 1 and Team 2 must be different.");
+    return;
+  }
+
   emit('update-match', {
     matchNo: match.match_no,
     updatedData: {
@@ -323,7 +374,6 @@ const saveRow = (match) => {
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2), 0 2px 2px rgba(0, 0, 0, 0.14), 0 3px 1px -2px rgba(0, 0, 0, 0.12);
-  overflow: hidden;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -419,7 +469,7 @@ const saveRow = (match) => {
 
 /* Quasar Styled Table - Expanded Spacing */
 .q-table-wrapper {
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .q-table {
@@ -486,6 +536,38 @@ const saveRow = (match) => {
 }
 
 /* Inline Edit Text Inputs */
+.dropdown-container {
+  position: relative;
+}
+
+.q-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  padding: 8px 0;
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2), 0 2px 2px rgba(0, 0, 0, 0.14), 0 3px 1px -2px rgba(0, 0, 0, 0.12);
+  list-style: none;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 2000;
+  min-width: 140px;
+}
+
+.q-menu li {
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  color: #1e293b;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.q-menu li:hover {
+  background: #f1f5f9;
+}
+
 .q-edit-input {
   background: #ffffff;
   border: 1px solid #bdbdbd;
