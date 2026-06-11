@@ -76,7 +76,7 @@
             <!-- Result column -->
             <td class="text-left">
               <select :value="match.result || ''" @change="onResultChange(match.match_no, $event.target.value)"
-                class="q-table-select result-select">
+                class="q-table-select result-select" :class="match.result ? 'status-completed' : 'status-upcoming'">
                 <option value="">- Set Result -</option>
                 <option value="TEAM1">TEAM 1 ({{ match.team1 }})</option>
                 <option value="TEAM2">TEAM 2 ({{ match.team2 }})</option>
@@ -86,16 +86,12 @@
 
             <!-- Phone Number column -->
             <td class="text-left">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.phone" type="text" class="q-edit-input"
-                placeholder="Phone..." />
-              <span v-else>{{ match.phone || match.phone_number || '-' }}</span>
+              <span>{{ match.phone || match.phone_number || '-' }}</span>
             </td>
 
             <!-- Winner column -->
             <td class="text-left">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.winner" type="text" class="q-edit-input"
-                placeholder="Winner Name..." />
-              <span v-else-if="match.winner" class="q-winner-name">{{ match.winner }}</span>
+              <span v-if="match.winner" class="q-winner-name">{{ match.winner }}</span>
               <span v-else class="text-grey">-</span>
             </td>
             <!-- Select toggle column -->
@@ -537,6 +533,15 @@ const saveRow = (match) => {
   background: rgba(211, 47, 47, 0.04);
   color: #d32f2f;
   font-weight: 600;
+}
+
+.result-select {
+  width: 100%;
+  min-width: 160px;
+  max-width: 160px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 /* Slider toggle style */

@@ -42,21 +42,22 @@
           </div>
 
           <!-- Team 1 & Team 2 -->
-          <div class="form-group">
+          <div class="form-group dropdown-container">
             <label for="team1">Team 1 (Home)</label>
-            <input id="team1" v-model="form.team1" type="text" placeholder="e.g. Team 1" required class="form-input" />
+            <input id="team1" v-model="form.team1" @focus="focusTeam1 = true" @blur="onBlurTeam1" type="text" placeholder="e.g. Mexico" required class="form-input" autocomplete="off" />
+            <ul class="q-menu" v-if="focusTeam1 && filteredTeam1.length">
+              <li v-for="c in filteredTeam1" :key="c" @mousedown="selectTeam1(c)">{{ c }}</li>
+            </ul>
           </div>
 
-          <div class="form-group">
+          <div class="form-group dropdown-container">
             <label for="team2">Team 2 (Away)</label>
-            <input id="team2" v-model="form.team2" type="text" placeholder="e.g. Team 2" required class="form-input" />
+            <input id="team2" v-model="form.team2" @focus="focusTeam2 = true" @blur="onBlurTeam2" type="text" placeholder="e.g. South Africa" required class="form-input" autocomplete="off" />
+            <ul class="q-menu" v-if="focusTeam2 && filteredTeam2.length">
+              <li v-for="c in filteredTeam2" :key="c" @mousedown="selectTeam2(c)">{{ c }}</li>
+            </ul>
           </div>
 
-          <!-- Phone Number -->
-          <div class="form-group">
-            <label for="phone">Phone Number (Optional)</label>
-            <input id="phone" v-model="form.phone" type="text" placeholder="e.g. +123456789" class="form-input" />
-          </div>
 
           <!-- Actions -->
           <div class="modal-footer">
@@ -73,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, watch, onMounted, onUnmounted, computed } from 'vue';
 
 const props = defineProps({
   show: {
@@ -88,17 +89,50 @@ const props = defineProps({
 
 const emit = defineEmits(['confirm', 'cancel']);
 
+import countries from '../data/countries.json';
+
 const initialForm = {
   match_no: null,
   stage: '',
   team1: '',
   team2: '',
-  status: 'upcoming',
-  phone: ''
+  status: 'upcoming'
 };
 
 const form = reactive({ ...initialForm });
 const errorMsg = ref('');
+
+// Dropdown states
+const focusTeam1 = ref(false);
+const focusTeam2 = ref(false);
+
+const filteredTeam1 = computed(() => {
+  const query = form.team1.toLowerCase();
+  return countries.filter(c => c.toLowerCase().includes(query));
+});
+
+const filteredTeam2 = computed(() => {
+  const query = form.team2.toLowerCase();
+  return countries.filter(c => c.toLowerCase().includes(query));
+});
+
+const onBlurTeam1 = () => {
+  setTimeout(() => { focusTeam1.value = false; }, 150);
+};
+
+const onBlurTeam2 = () => {
+  setTimeout(() => { focusTeam2.value = false; }, 150);
+};
+
+const selectTeam1 = (c) => {
+  form.team1 = c;
+  focusTeam1.value = false;
+};
+
+const selectTeam2 = (c) => {
+  form.team2 = c;
+  focusTeam2.value = false;
+};
 
 // Reset form when modal opens
 watch(() => props.show, (newVal) => {
@@ -124,6 +158,16 @@ const handleSubmit = () => {
   // Validation: Positive integer for Match Number
   if (!Number.isInteger(form.match_no) || form.match_no <= 0) {
     errorMsg.value = 'Match number must be a positive integer.';
+    return;
+  }
+
+  // Validation: Must be from the allowed countries list
+  if (!countries.includes(form.team1)) {
+    errorMsg.value = `Team 1 must be one of the allowed countries.`;
+    return;
+  }
+  if (!countries.includes(form.team2)) {
+    errorMsg.value = `Team 2 must be one of the allowed countries.`;
     return;
   }
 
@@ -229,6 +273,38 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.dropdown-container {
+  position: relative;
+}
+
+.q-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  padding: 8px 0;
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.2), 0 2px 2px rgba(0, 0, 0, 0.14), 0 3px 1px -2px rgba(0, 0, 0, 0.12);
+  list-style: none;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 2000;
+}
+
+.q-menu li {
+  padding: 10px 16px;
+  font-size: 0.88rem;
+  color: #1e293b;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.q-menu li:hover {
+  background: #f1f5f9;
 }
 
 .form-group label {
