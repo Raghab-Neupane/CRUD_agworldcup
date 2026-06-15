@@ -142,9 +142,12 @@ const fetchResultDetails = async (postId) => {
     resultDetails.value = {
       winner_name: data.winner?.name || '',
       winner_phone: data.winner?.mobile_number || '',
-      winner_point: data.winner?.point || 0,
+      winner_point: data.winner?.points !== undefined ? data.winner.points : (data.winner?.point || 0),
       participants: '',
-      participants_list: data.participants || []
+      participants_list: (data.participants || []).map(p => ({
+        ...p,
+        point: p.points !== undefined ? p.points : (p.point || 0)
+      }))
     };
   } catch (e) {
     console.error('Failed to fetch result details', e);
