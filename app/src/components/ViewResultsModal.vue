@@ -122,7 +122,7 @@ const matchesWithPostId = computed(() => {
 
 // TODO: Replace the static JSON import with an environment variable pointing to the result endpoint.
 // const fetchData = ... (remove this line when using the real API)
-import fetchData from '../data/fetch.json';
+// Removed static fetchData import; fetching results from API
 
 // Fetches result details from the backend endpoint defined in an environment variable.
 // Replace the dummy implementation below with a call to the API, e.g.:
@@ -134,22 +134,24 @@ import fetchData from '../data/fetch.json';
 //     winner_name: data.winner?.name || '',
 //     winner_phone: data.winner?.mobile_number || '',
 //     winner_point: data.winner?.point || 0,
-//     participants: '',
-//     participants_list: data.participants || []
-//   };
-// };
-
-// Temporary static fallback for development (remove when using real endpoint)
 const fetchResultDetails = async (postId) => {
-  // In this dummy version, ignore postId and use the static data
-  const data = fetchData; // keep this line only for dev/testing
-  resultDetails.value = {
-    winner_name: data.winner?.name || '',
-    winner_phone: data.winner?.mobile_number || '',
-    winner_point: data.winner?.point || 0,
-    participants: '',
-    participants_list: data.participants || []
-  };
+  loadingResult.value = true;
+  try {
+    const config = useRuntimeConfig();
+    const data = await matchService.getResult(postId, config.public.getresultServiceUrl);
+    resultDetails.value = {
+      winner_name: data.winner?.name || '',
+      winner_phone: data.winner?.mobile_number || '',
+      winner_point: data.winner?.point || 0,
+      participants: '',
+      participants_list: data.participants || []
+    };
+  } catch (e) {
+    console.error('Failed to fetch result details', e);
+    resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '', participants_list: [] };
+  } finally {
+    loadingResult.value = false;
+  }
 };
 
 // Watch selected match to trigger results fetch

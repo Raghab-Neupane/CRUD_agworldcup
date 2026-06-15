@@ -267,7 +267,9 @@ const handleCalculateMatch = async (match) => {
       end_time: now
     };
 
-    const result = await matchService.calculate(payload);
+    // Fetch calculate service URL from config and execute request
+    const config = useRuntimeConfig();
+    const result = await matchService.calculate(payload, config.public.calcServiceUrl);
     console.log('Calculation outcome:', result);
     addToast('Calculated result successfully.', 'success');
   } catch (error) {

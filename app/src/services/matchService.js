@@ -84,7 +84,11 @@ export default {
    * Post to calculate endpoint.
    * POST /calculate
    */
-  async calculate(payload) {
+  async calculate(payload, baseUrl) {
+    if (baseUrl) {
+      const response = await axios.post(baseUrl, payload);
+      return response.data;
+    }
     const response = await apiClient.post('/calculate', payload);
     return response.data;
   },
@@ -93,8 +97,16 @@ export default {
    * Fetch result details by post ID.
    * GET /getresult
    */
-  async getResult(postId) {
-    const response = await apiClient.get(`/getresult/${postId}`);
+  async getResult(postId, baseUrl) {
+    if (baseUrl) {
+      const response = await axios.get(baseUrl, {
+        params: { post_id: postId }
+      });
+      return response.data;
+    }
+    const response = await apiClient.get('/getresult', {
+      params: { post_id: postId }
+    });
     return response.data;
   }
 };
