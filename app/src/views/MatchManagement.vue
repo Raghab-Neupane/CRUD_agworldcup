@@ -66,7 +66,6 @@
           :active-status-filter="activeStatusFilter"
           @request-delete="triggerDeleteConfirmation"
           @update-status="handleUpdateStatus"
-          @update-result="handleUpdateResult"
           @update-match="handleUpdateMatch"
           @calculate-match="handleCalculateMatch"
           @show-toast="e => addToast(e.message, e.type)"
@@ -221,22 +220,7 @@ const handleUpdateStatus = async ({ matchNo, status }) => {
   }
 };
 
-const handleUpdateResult = async ({ matchNo, result }) => {
-  loading.value = true;
-  try {
-    const updatedMatch = await matchService.updateMatchResult(matchNo, result);
-    const index = matches.value.findIndex(m => m.match_no === matchNo);
-    if (index !== -1) {
-      matches.value[index] = updatedMatch;
-    }
-    addToast(`Match #${matchNo} result updated to ${result || 'None'}!`, 'success');
-  } catch (error) {
-    const errorMsg = error.response?.data?.detail || error.message || 'Failed to update result';
-    addToast(errorMsg, 'error');
-  } finally {
-    loading.value = false;
-  }
-};
+
 
 
 
@@ -264,36 +248,6 @@ const handleCalculateMatch = async (match) => {
     const g1 = parts[0] !== undefined && parts[0] !== '' ? parseInt(parts[0], 10) : 0;
     const g2 = parts[1] !== undefined && parts[1] !== '' ? parseInt(parts[1], 10) : 0;
 
-    let winner_team_name = '';
-    let winner_goal = 0;
-    let loser_team_name = '';
-    let loser_goal = 0;
-
-    if (g1 > g2) {
-      winner_team_name = match.team1;
-      winner_goal = g1;
-      loser_team_name = match.team2;
-      loser_goal = g2;
-    } else if (g2 > g1) {
-      winner_team_name = match.team2;
-      winner_goal = g2;
-      loser_team_name = match.team1;
-      loser_goal = g1;
-    } else {
-      // Draw (g1 === g2)
-      if (match.result === 'TEAM2') {
-        winner_team_name = match.team2;
-        winner_goal = g2;
-        loser_team_name = match.team1;
-        loser_goal = g1;
-      } else {
-        winner_team_name = match.team1;
-        winner_goal = g1;
-        loser_team_name = match.team2;
-        loser_goal = g2;
-      }
-    }
-
     let pid = match.post_id || match.match_no;
     try {
       const parsed = parseInt(pid, 10);
@@ -302,18 +256,20 @@ const handleCalculateMatch = async (match) => {
       }
     } catch (e) {}
 
+    const now = new Date().toISOString();
     const payload = {
       post_id: pid,
       team_1_name: match.team1,
       team_1_goal: g1,
       team_2_name: match.team2,
       team_2_goal: g2,
-      winner_team_name
+      start_time: now,
+      end_time: now
     };
 
     const result = await matchService.calculate(payload);
     console.log('Calculation outcome:', result);
-    addToast(`Calculated outcome: Winner is ${result.winner_team_name}. Score: ${result.team_1_name} ${result.team_1_goal} - ${result.team_2_goal} ${result.team_2_name}`, 'success');
+    addToast('Calculated result successfully.', 'success');
   } catch (error) {
     const errorMsg = error.response?.data?.detail || error.message || 'Failed to calculate match outcomes';
     addToast(errorMsg, 'error');

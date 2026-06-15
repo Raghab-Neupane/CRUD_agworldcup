@@ -41,7 +41,7 @@
                     </p>
                   </div>
                   <div class="winner-info-right" v-if="resultDetails.winner_name">
-                    <span class="pts-badge winner-pts">100 Points</span>
+                    <span class="pts-badge winner-pts">{{ resultDetails.winner_point }} Points</span>
                   </div>
                 </div>
 
@@ -59,10 +59,10 @@
                         <div class="p-info">
                           <span class="p-index">{{ idx + 1 }}</span>
                           <span class="p-name-bold">{{ p.name }}</span>
-                          <span class="p-phone-light" v-if="p.phone">({{ p.phone }})</span>
+                          <span class="p-phone-light" v-if="p.mobile_number">({{ p.mobile_number }})</span>
                         </div>
                         <div class="p-points">
-                          <span class="pts-badge participant-pts">10 Points</span>
+                          <span class="pts-badge participant-pts">{{ p.point }} Points</span>
                         </div>
                       </div>
                     </div>
@@ -109,6 +109,7 @@ const selectedMatch = ref(null);
 const resultDetails = ref({
   winner_name: '',
   winner_phone: '',
+  winner_point: 0,
   participants: '',
   participants_list: []
 });
@@ -119,28 +120,36 @@ const matchesWithPostId = computed(() => {
   return props.matches.filter(m => m.post_id && m.post_id.trim() !== '');
 });
 
-// Fetches match outcome details (winner name, winner phone, and other participants)
-// from the GET /getresult?post_id=... endpoint on the backend.
+// TODO: Replace the static JSON import with an environment variable pointing to the result endpoint.
+// const fetchData = ... (remove this line when using the real API)
+import fetchData from '../data/fetch.json';
+
+// Fetches result details from the backend endpoint defined in an environment variable.
+// Replace the dummy implementation below with a call to the API, e.g.:
+// const fetchResultDetails = async (postId) => {
+//   const endpoint = import.meta.env.VITE_RESULT_ENDPOINT; // adjust as needed
+//   const res = await fetch(`${endpoint}/${postId}`);
+//   const data = await res.json();
+//   resultDetails.value = {
+//     winner_name: data.winner?.name || '',
+//     winner_phone: data.winner?.mobile_number || '',
+//     winner_point: data.winner?.point || 0,
+//     participants: '',
+//     participants_list: data.participants || []
+//   };
+// };
+
+// Temporary static fallback for development (remove when using real endpoint)
 const fetchResultDetails = async (postId) => {
-  if (!postId) {
-    resultDetails.value = { winner_name: '', winner_phone: '', participants: '' };
-    return;
-  }
-  loadingResult.value = true;
-  try {
-    const res = await matchService.getResult(postId);
-    resultDetails.value = {
-      winner_name: res.winner_name || '',
-      winner_phone: res.winner_phone || '',
-      participants: res.participants || '',
-      participants_list: res.participants_list || []
-    };
-  } catch (e) {
-    console.error('Failed to fetch result details', e);
-    resultDetails.value = { winner_name: '', winner_phone: '', participants: '' };
-  } finally {
-    loadingResult.value = false;
-  }
+  // In this dummy version, ignore postId and use the static data
+  const data = fetchData; // keep this line only for dev/testing
+  resultDetails.value = {
+    winner_name: data.winner?.name || '',
+    winner_phone: data.winner?.mobile_number || '',
+    winner_point: data.winner?.point || 0,
+    participants: '',
+    participants_list: data.participants || []
+  };
 };
 
 // Watch selected match to trigger results fetch
@@ -150,7 +159,7 @@ watch(
     if (newVal) {
       fetchResultDetails(newVal.post_id);
     } else {
-      resultDetails.value = { winner_name: '', winner_phone: '', participants: '' };
+      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '' };
     }
   }
 );
@@ -163,7 +172,7 @@ watch(
       selectedMatch.value = matchesWithPostId.value[0];
     } else if (!newVal) {
       selectedMatch.value = null;
-      resultDetails.value = { winner_name: '', winner_phone: '', participants: '' };
+      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '' };
     }
   },
   { immediate: true }

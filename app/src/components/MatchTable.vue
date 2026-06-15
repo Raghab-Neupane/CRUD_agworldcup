@@ -30,7 +30,7 @@
             <th class="text-left">Stage</th>
             <th class="text-left">Team 1</th>
             <th class="text-left">Team 2</th>
-            <th class="text-left">Result</th>
+
             <th class="text-left">Post ID</th>
             <th class="text-left">Team 1 Goal</th>
             <th class="text-left">Team 2 Goal</th>
@@ -75,15 +75,7 @@
             </td>
 
             <!-- Result column -->
-            <td class="text-left">
-              <select :value="match.result || ''" @change="onResultChange(match.match_no, $event.target.value)"
-                class="q-table-select result-select" :class="match.result ? 'status-completed' : 'status-upcoming'">
-                <option value="">- Set Result -</option>
-                <option value="TEAM1">TEAM 1 ({{ match.team1 }})</option>
-                <option value="TEAM2">TEAM 2 ({{ match.team2 }})</option>
-                <option value="DRAW">DRAW</option>
-              </select>
-            </td>
+
 
             <!-- Post ID column -->
             <td class="text-left">
@@ -94,13 +86,13 @@
             <!-- Team 1 Goal column -->
             <td class="text-left">
               <input v-if="editingMatchNo === match.match_no" v-model="editForm.team_1_goal" type="number" min="0" class="q-edit-input" style="max-width: 80px;" placeholder="e.g. 3" />
-              <span v-else>{{ getTeam1Goal(match.goal_difference) }}</span>
+              <span v-else>{{ match.team_1_goal !== null && match.team_1_goal !== undefined ? match.team_1_goal : '-' }}</span>
             </td>
-
+            
             <!-- Team 2 Goal column -->
             <td class="text-left">
               <input v-if="editingMatchNo === match.match_no" v-model="editForm.team_2_goal" type="number" min="0" class="q-edit-input" style="max-width: 80px;" placeholder="e.g. 1" />
-              <span v-else>{{ getTeam2Goal(match.goal_difference) }}</span>
+              <span v-else>{{ match.team_2_goal !== null && match.team_2_goal !== undefined ? match.team_2_goal : '-' }}</span>
             </td>
 
             <!-- Start Time column -->
@@ -185,7 +177,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['request-delete', 'update-status', 'update-result', 'update-match', 'calculate-match', 'show-toast']);
+const emit = defineEmits(['request-delete', 'update-status', 'update-match', 'calculate-match', 'show-toast']);
 
 // New state for selected match toggle
 const selectedMatchId = ref(null);
@@ -198,19 +190,25 @@ watch(() => props.matches, (newMatches) => {
 }, { immediate: true, deep: true });
 
 const toggleSelect = async (match) => {
-  if (!match.winner) {
-    emit('show-toast', { message: 'Please calculate the result at first', type: 'error' });
-    // Reset selection state to prevent checkbox change
-    const selected = props.matches.find(m => m.is_selected);
-    selectedMatchId.value = selected ? selected.match_no : null;
-    return;
-  }
-  selectedMatchId.value = match.match_no;
-  try {
-    await matchService.updateSelectedMatch(match.match_no, { winner: match.winner, phone: match.phone });
-    emit('show-toast', { message: `Selected Match #${match.match_no} as active match!`, type: 'success' });
-  } catch (e) {
-    console.error('Failed to update selected match', e);
+  // Allow toggling selection regardless of winner status
+  if (selectedMatchId.value === match.match_no) {
+    // Deselect current match
+    selectedMatchId.value = null;
+    try {
+      await matchService.updateSelectedMatch(match.match_no, { winner: null, phone: null });
+      emit('show-toast', { message: `Deselected Match #${match.match_no}.`, type: 'info' });
+    } catch (e) {
+      console.error('Failed to deselect match', e);
+    }
+  } else {
+    // Select new match
+    selectedMatchId.value = match.match_no;
+    try {
+      await matchService.updateSelectedMatch(match.match_no, { winner: match.winner, phone: match.phone });
+      emit('show-toast', { message: `Selected Match #${match.match_no} as active match!`, type: 'success' });
+    } catch (e) {
+      console.error('Failed to update selected match', e);
+    }
   }
 };
 
@@ -346,10 +344,6 @@ const onStatusChange = (matchNo, status) => {
   emit('update-status', { matchNo, status });
 };
 
-const onResultChange = (matchNo, result) => {
-  emit('update-result', { matchNo, result: result || null });
-};
-
 const getTeam1Goal = (goalDiff) => {
   if (!goalDiff || !goalDiff.includes('-')) return '-';
   return goalDiff.split('-')[0];
@@ -409,14 +403,14 @@ const saveRow = (match) => {
     updatedData: {
       match_no: match.match_no,
       status: match.status,
-      result: match.result,
       stage: editForm.value.stage,
       team1: editForm.value.team1,
       team2: editForm.value.team2,
       phone: editForm.value.phone,
       winner: editForm.value.winner,
       post_id: editForm.value.post_id,
-      goal_difference: goal_difference,
+      team_1_goal: editForm.value.team_1_goal,
+      team_2_goal: editForm.value.team_2_goal,
       start_time: editForm.value.start_time ? editForm.value.start_time.replace('T', ' ') : '',
       end_time: editForm.value.end_time ? editForm.value.end_time.replace('T', ' ') : '',
       participants: editForm.value.participants

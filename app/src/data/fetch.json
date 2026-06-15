@@ -1,0 +1,25 @@
+{
+    "participants": [
+        {
+            "customer_id": "1",
+            "name": "anish",
+            "photo": "photo",
+            "point": 10,
+            "mobile_number": "9842011111"
+        },
+        {
+            "customer_id": "2",
+            "name": "anup",
+            "photo": "photo",
+            "point": 100,
+            "mobile_number": "9842022222"
+        }
+    ],
+    "winner": {
+        "customer_id": "2",
+        "name": "anup",
+        "photo": "photo",
+        "point": 100,
+        "mobile_number": "9842022222"
+    }
+}

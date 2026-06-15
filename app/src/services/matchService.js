@@ -42,17 +42,6 @@ export default {
   },
 
   /**
-   * Update the result of a match.
-   * PUT /matches/{match_no}/result
-   * @param {number|string} matchNo
-   * @param {string} result ('TEAM1', 'TEAM2', 'DRAW')
-   */
-  async updateMatchResult(matchNo, result) {
-    const response = await apiClient.put(`/matches/${matchNo}/result`, { result });
-    return response.data;
-  },
-
-  /**
    * Delete a match by its number.
    * DELETE /matches/{match_no}
    * @param {number|string} matchNo
