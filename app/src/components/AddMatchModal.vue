@@ -69,7 +69,7 @@
 
             <div class="form-group">
               <label for="start_time">Start Time</label>
-              <input id="start_time" v-model="form.start_time" type="datetime-local" class="form-input" />
+              <input id="start_time" v-model="form.start_time" type="text" placeholder="YYYY-MM-DD HH:mm:ss" class="form-input" />
             </div>
           </div>
 
@@ -77,7 +77,7 @@
           <div class="form-row split">
             <div class="form-group">
               <label for="end_time">Match End Time</label>
-              <input id="end_time" v-model="form.end_time" type="datetime-local" class="form-input" />
+              <input id="end_time" v-model="form.end_time" type="text" placeholder="YYYY-MM-DD HH:mm:ss" class="form-input" />
             </div>
           </div>
 
@@ -165,10 +165,29 @@ const selectTeam2 = (c) => {
   focusTeam2.value = false;
 };
 
+const getKathmanduNow = () => {
+  const date = new Date();
+  const kathmanduOffsetMs = (5 * 60 + 45) * 60 * 1000;
+  const ktmDate = new Date(date.getTime() + kathmanduOffsetMs);
+
+  const pad = (num) => String(num).padStart(2, '0');
+  const yyyy = ktmDate.getUTCFullYear();
+  const mm = pad(ktmDate.getUTCMonth() + 1);
+  const dd = pad(ktmDate.getUTCDate());
+  const hh = pad(ktmDate.getUTCHours());
+  const min = pad(ktmDate.getUTCMinutes());
+  const ss = pad(ktmDate.getUTCSeconds());
+
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+};
+
 // Reset form when modal opens
 watch(() => props.show, (newVal) => {
   if (newVal) {
     Object.assign(form, initialForm);
+    const nowKtm = getKathmanduNow();
+    form.start_time = nowKtm;
+    form.end_time = nowKtm;
     errorMsg.value = '';
   }
 });
@@ -208,14 +227,9 @@ const handleSubmit = () => {
     return;
   }
 
-  // Format start_time from datetime-local ISO (YYYY-MM-DDTHH:MM) to DB format (YYYY-MM-DD HH:MM:SS)
   const formattedForm = { ...form };
-  if (formattedForm.start_time) {
-    formattedForm.start_time = formattedForm.start_time.replace('T', ' ');
-  }
-  if (formattedForm.end_time) {
-    formattedForm.end_time = formattedForm.end_time.replace('T', ' ');
-  }
+  if (!formattedForm.start_time) formattedForm.start_time = null;
+  if (!formattedForm.end_time) formattedForm.end_time = null;
 
   emit('confirm', formattedForm);
 };

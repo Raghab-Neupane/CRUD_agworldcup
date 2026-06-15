@@ -255,15 +255,48 @@ const handleCalculateMatch = async (match) => {
       }
     } catch (e) {}
 
-    const now = new Date().toISOString();
+    const getKathmanduTime = (dateInput) => {
+      let date;
+      if (!dateInput) {
+        date = new Date();
+      } else {
+        let str = String(dateInput).trim();
+        if (str.includes(' ')) {
+          str = str.replace(' ', 'T');
+        }
+        date = new Date(str);
+      }
+
+      if (isNaN(date.getTime())) {
+        date = new Date();
+      }
+
+      // Kathmandu is UTC +05:45
+      const kathmanduOffsetMs = (5 * 60 + 45) * 60 * 1000;
+      const ktmDate = new Date(date.getTime() + kathmanduOffsetMs);
+
+      const pad = (num) => String(num).padStart(2, '0');
+      const yyyy = ktmDate.getUTCFullYear();
+      const mm = pad(ktmDate.getUTCMonth() + 1);
+      const dd = pad(ktmDate.getUTCDate());
+      const hh = pad(ktmDate.getUTCHours());
+      const min = pad(ktmDate.getUTCMinutes());
+      const ss = pad(ktmDate.getUTCSeconds());
+
+      return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}+05:45`;
+    };
+
+    const startTimeFormatted = getKathmanduTime(match.start_time);
+    const endTimeFormatted = getKathmanduTime(match.end_time);
+
     const payload = {
       post_id: pid,
       team_1_name: match.team1,
       team_1_goal: g1,
       team_2_name: match.team2,
       team_2_goal: g2,
-      start_time: now,
-      end_time: now
+      start_time: startTimeFormatted,
+      end_time: endTimeFormatted
     };
 
     // Fetch calculate service URL from config and execute request

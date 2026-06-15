@@ -97,13 +97,13 @@
 
             <!-- Start Time column -->
             <td class="text-left">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.start_time" type="datetime-local" class="q-edit-input" style="max-width: 180px;" />
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.start_time" type="text" placeholder="YYYY-MM-DD HH:mm:ss" class="q-edit-input" style="max-width: 180px;" />
               <span v-else>{{ match.start_time || '-' }}</span>
             </td>
 
             <!-- Match End Time column -->
             <td class="text-left">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.end_time" type="datetime-local" class="q-edit-input" style="max-width: 180px;" />
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.end_time" type="text" placeholder="YYYY-MM-DD HH:mm:ss" class="q-edit-input" style="max-width: 180px;" />
               <span v-else>{{ match.end_time || '-' }}</span>
             </td>
 
@@ -368,8 +368,8 @@ const startEditing = (match) => {
     post_id: match.post_id || '',
     team_1_goal: g1,
     team_2_goal: g2,
-    start_time: match.start_time ? match.start_time.replace(' ', 'T').slice(0, 16) : '',
-    end_time: match.end_time ? match.end_time.replace(' ', 'T').slice(0, 16) : '',
+    start_time: match.start_time || '',
+    end_time: match.end_time || '',
     // Maps the comma-separated participants list for the match editor state
     participants: match.participants || ''
   };
@@ -410,8 +410,8 @@ const saveRow = (match) => {
       post_id: editForm.value.post_id,
       team_1_goal: editForm.value.team_1_goal !== '' ? Number(editForm.value.team_1_goal) : null,
       team_2_goal: editForm.value.team_2_goal !== '' ? Number(editForm.value.team_2_goal) : null,
-      start_time: editForm.value.start_time ? editForm.value.start_time.replace('T', ' ') : null,
-      end_time: editForm.value.end_time ? editForm.value.end_time.replace('T', ' ') : null,
+      start_time: editForm.value.start_time || null,
+      end_time: editForm.value.end_time || null,
       participants: editForm.value.participants
     }
   });
