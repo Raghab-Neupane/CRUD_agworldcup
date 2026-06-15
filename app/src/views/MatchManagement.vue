@@ -244,9 +244,8 @@ const handleUpdateMatch = async ({ matchNo, updatedData }) => {
 const handleCalculateMatch = async (match) => {
   loading.value = true;
   try {
-    const parts = (match.goal_difference || '').split('-');
-    const g1 = parts[0] !== undefined && parts[0] !== '' ? parseInt(parts[0], 10) : 0;
-    const g2 = parts[1] !== undefined && parts[1] !== '' ? parseInt(parts[1], 10) : 0;
+    const g1 = match.team_1_goal !== null && match.team_1_goal !== undefined && match.team_1_goal !== '' ? parseInt(match.team_1_goal, 10) : 0;
+    const g2 = match.team_2_goal !== null && match.team_2_goal !== undefined && match.team_2_goal !== '' ? parseInt(match.team_2_goal, 10) : 0;
 
     let pid = match.post_id || match.match_no;
     try {

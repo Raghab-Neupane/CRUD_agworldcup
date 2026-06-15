@@ -357,9 +357,8 @@ const getTeam2Goal = (goalDiff) => {
 // Editing row handlers
 const startEditing = (match) => {
   editingMatchNo.value = match.match_no;
-  const parts = (match.goal_difference || '').split('-');
-  const g1 = parts[0] !== undefined ? parts[0] : '';
-  const g2 = parts[1] !== undefined ? parts[1] : '';
+  const g1 = match.team_1_goal !== null && match.team_1_goal !== undefined ? match.team_1_goal : '';
+  const g2 = match.team_2_goal !== null && match.team_2_goal !== undefined ? match.team_2_goal : '';
   editForm.value = {
     stage: match.stage,
     team1: match.team1,
