@@ -89,6 +89,24 @@ export default {
   async updateSelectedMatch(matchNo, payload) {
     const response = await apiClient.patch(`/matches/selectedmatch/${matchNo}`, payload);
     return response.data;
+  },
+
+  /**
+   * Post to calculate endpoint.
+   * POST /calculate
+   */
+  async calculate(payload) {
+    const response = await apiClient.post('/calculate', payload);
+    return response.data;
+  },
+
+  /**
+   * Fetch result details by post ID.
+   * GET /getresult
+   */
+  async getResult(postId) {
+    const response = await apiClient.get(`/getresult/${postId}`);
+    return response.data;
   }
 };
 

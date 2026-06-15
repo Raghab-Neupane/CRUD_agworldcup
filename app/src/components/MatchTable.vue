@@ -30,10 +30,12 @@
             <th class="text-left">Stage</th>
             <th class="text-left">Team 1</th>
             <th class="text-left">Team 2</th>
-            <th class="text-left">Status</th>
             <th class="text-left">Result</th>
-            <th class="text-left">Phone Number</th>
-            <th class="text-left">Winner</th>
+            <th class="text-left">Post ID</th>
+            <th class="text-left">Team 1 Goal</th>
+            <th class="text-left">Team 2 Goal</th>
+            <th class="text-left">Start Time</th>
+            <th class="text-left">Match End Time</th>
             <th class="text-left">Select</th>
             <th class="text-right">Actions</th>
           </tr>
@@ -72,15 +74,6 @@
               <span v-else>{{ match.team2 }}</span>
             </td>
 
-            <!-- Status column -->
-            <td class="text-left">
-              <select :value="match.status" @change="onStatusChange(match.match_no, $event.target.value)"
-                class="q-table-select" :class="'status-' + match.status">
-                <option value="upcoming">Upcoming</option>
-                <option value="completed">Completed</option>
-              </select>
-            </td>
-
             <!-- Result column -->
             <td class="text-left">
               <select :value="match.result || ''" @change="onResultChange(match.match_no, $event.target.value)"
@@ -92,20 +85,39 @@
               </select>
             </td>
 
-            <!-- Phone Number column -->
+            <!-- Post ID column -->
             <td class="text-left">
-              <span>{{ match.phone || match.phone_number || '-' }}</span>
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.post_id" type="text" class="q-edit-input" style="max-width: 100px;" />
+              <span v-else>{{ match.post_id || '-' }}</span>
             </td>
 
-            <!-- Winner column -->
+            <!-- Team 1 Goal column -->
             <td class="text-left">
-              <span v-if="match.winner" class="q-winner-name">{{ match.winner }}</span>
-              <span v-else class="text-grey">-</span>
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.team_1_goal" type="number" min="0" class="q-edit-input" style="max-width: 80px;" placeholder="e.g. 3" />
+              <span v-else>{{ getTeam1Goal(match.goal_difference) }}</span>
             </td>
+
+            <!-- Team 2 Goal column -->
+            <td class="text-left">
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.team_2_goal" type="number" min="0" class="q-edit-input" style="max-width: 80px;" placeholder="e.g. 1" />
+              <span v-else>{{ getTeam2Goal(match.goal_difference) }}</span>
+            </td>
+
+            <!-- Start Time column -->
+            <td class="text-left">
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.start_time" type="datetime-local" class="q-edit-input" style="max-width: 180px;" />
+              <span v-else>{{ match.start_time || '-' }}</span>
+            </td>
+
+            <!-- Match End Time column -->
+            <td class="text-left">
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.end_time" type="datetime-local" class="q-edit-input" style="max-width: 180px;" />
+              <span v-else>{{ match.end_time || '-' }}</span>
+            </td>
+
             <!-- Select toggle column -->
             <td class="text-center">
-              <input type="checkbox" :checked="selectedMatchId === match.match_no" @change="toggleSelect(match)"
-                class="select-toggle" />
+              <div :class="['select-toggle-switch', { checked: selectedMatchId === match.match_no }]" @click="toggleSelect(match)"></div>
             </td>
             <td class="text-right actions-cell">
               <div v-if="editingMatchNo === match.match_no" class="actions-group">
@@ -113,6 +125,7 @@
                 <button class="q-btn-cancel-row" @click="cancelEditing">Cancel</button>
               </div>
               <div v-else class="actions-group">
+                <button class="q-btn-calculate" @click="$emit('calculate-match', match)">Calculate</button>
                 <button class="q-btn-edit-row" @click="startEditing(match)">Edit</button>
                 <button class="q-btn-delete" @click="$emit('request-delete', match.match_no)">Delete</button>
               </div>
@@ -120,7 +133,7 @@
           </tr>
           <!-- Empty State -->
           <tr v-if="filteredMatches.length === 0">
-            <td colspan="9" class="empty-row">
+            <td colspan="12" class="empty-row">
               <div class="empty-box">
                 <p>No match records found matching the criteria.</p>
               </div>
@@ -172,7 +185,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['request-delete', 'update-status', 'update-result', 'update-match']);
+const emit = defineEmits(['request-delete', 'update-status', 'update-result', 'update-match', 'calculate-match', 'show-toast']);
 
 // New state for selected match toggle
 const selectedMatchId = ref(null);
@@ -185,10 +198,17 @@ watch(() => props.matches, (newMatches) => {
 }, { immediate: true, deep: true });
 
 const toggleSelect = async (match) => {
-  // If already selected, deselect (optional) – here we keep at least one selected
+  if (!match.winner) {
+    emit('show-toast', { message: 'Please calculate the result at first', type: 'error' });
+    // Reset selection state to prevent checkbox change
+    const selected = props.matches.find(m => m.is_selected);
+    selectedMatchId.value = selected ? selected.match_no : null;
+    return;
+  }
   selectedMatchId.value = match.match_no;
   try {
     await matchService.updateSelectedMatch(match.match_no, { winner: match.winner, phone: match.phone });
+    emit('show-toast', { message: `Selected Match #${match.match_no} as active match!`, type: 'success' });
   } catch (e) {
     console.error('Failed to update selected match', e);
   }
@@ -210,7 +230,13 @@ const editForm = ref({
   team1: '',
   team2: '',
   phone: '',
-  winner: ''
+  winner: '',
+  post_id: '',
+  team_1_goal: '',
+  team_2_goal: '',
+  start_time: '',
+  end_time: '',
+  participants: ''
 });
 
 // Dropdown states for inline editing
@@ -324,15 +350,35 @@ const onResultChange = (matchNo, result) => {
   emit('update-result', { matchNo, result: result || null });
 };
 
+const getTeam1Goal = (goalDiff) => {
+  if (!goalDiff || !goalDiff.includes('-')) return '-';
+  return goalDiff.split('-')[0];
+};
+
+const getTeam2Goal = (goalDiff) => {
+  if (!goalDiff || !goalDiff.includes('-')) return '-';
+  return goalDiff.split('-')[1];
+};
+
 // Editing row handlers
 const startEditing = (match) => {
   editingMatchNo.value = match.match_no;
+  const parts = (match.goal_difference || '').split('-');
+  const g1 = parts[0] !== undefined ? parts[0] : '';
+  const g2 = parts[1] !== undefined ? parts[1] : '';
   editForm.value = {
     stage: match.stage,
     team1: match.team1,
     team2: match.team2,
     phone: match.phone || match.phone_number || '',
-    winner: match.winner || ''
+    winner: match.winner || '',
+    post_id: match.post_id || '',
+    team_1_goal: g1,
+    team_2_goal: g2,
+    start_time: match.start_time ? match.start_time.replace(' ', 'T').slice(0, 16) : '',
+    end_time: match.end_time ? match.end_time.replace(' ', 'T').slice(0, 16) : '',
+    // Maps the comma-separated participants list for the match editor state
+    participants: match.participants || ''
   };
 };
 
@@ -351,6 +397,13 @@ const saveRow = (match) => {
     return;
   }
 
+  let goal_difference = null;
+  if (editForm.value.team_1_goal !== '' && editForm.value.team_2_goal !== '') {
+    goal_difference = `${editForm.value.team_1_goal}-${editForm.value.team_2_goal}`;
+  } else if (editForm.value.team_1_goal !== '' || editForm.value.team_2_goal !== '') {
+    goal_difference = `${editForm.value.team_1_goal}-${editForm.value.team_2_goal}`;
+  }
+
   emit('update-match', {
     matchNo: match.match_no,
     updatedData: {
@@ -361,7 +414,12 @@ const saveRow = (match) => {
       team1: editForm.value.team1,
       team2: editForm.value.team2,
       phone: editForm.value.phone,
-      winner: editForm.value.winner
+      winner: editForm.value.winner,
+      post_id: editForm.value.post_id,
+      goal_difference: goal_difference,
+      start_time: editForm.value.start_time ? editForm.value.start_time.replace('T', ' ') : '',
+      end_time: editForm.value.end_time ? editForm.value.end_time.replace('T', ' ') : '',
+      participants: editForm.value.participants
     }
   });
   editingMatchNo.value = null;
@@ -627,8 +685,7 @@ const saveRow = (match) => {
 }
 
 /* Slider toggle style */
-.select-toggle {
-  appearance: none;
+.select-toggle-switch {
   width: 40px;
   height: 20px;
   background: #e0e0e0;
@@ -636,13 +693,14 @@ const saveRow = (match) => {
   position: relative;
   cursor: pointer;
   transition: background 0.2s;
+  display: inline-block;
 }
 
-.select-toggle:checked {
+.select-toggle-switch.checked {
   background: #1976d2;
 }
 
-.select-toggle::before {
+.select-toggle-switch::before {
   content: '';
   position: absolute;
   width: 18px;
@@ -654,7 +712,7 @@ const saveRow = (match) => {
   transition: transform 0.2s;
 }
 
-.select-toggle:checked::before {
+.select-toggle-switch.checked::before {
   transform: translateX(20px);
 }
 
@@ -717,6 +775,22 @@ const saveRow = (match) => {
 
 .q-btn-edit-row:hover {
   background: #01579b;
+}
+
+.q-btn-calculate {
+  background: #2e7d32;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.q-btn-calculate:hover {
+  background: #1b5e20;
 }
 
 .q-btn-save-row {

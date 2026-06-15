@@ -42,20 +42,43 @@
           </div>
 
           <!-- Team 1 & Team 2 -->
-          <div class="form-group dropdown-container">
-            <label for="team1">Team 1 (Home)</label>
-            <input id="team1" v-model="form.team1" @focus="focusTeam1 = true" @blur="onBlurTeam1" type="text" placeholder="e.g. Mexico" required class="form-input" autocomplete="off" />
-            <ul class="q-menu" v-if="focusTeam1 && filteredTeam1.length">
-              <li v-for="c in filteredTeam1" :key="c" @mousedown="selectTeam1(c)">{{ c }}</li>
-            </ul>
+          <div class="form-row split">
+            <div class="form-group dropdown-container">
+              <label for="team1">Team 1 (Home)</label>
+              <input id="team1" v-model="form.team1" @focus="focusTeam1 = true" @blur="onBlurTeam1" type="text" placeholder="e.g. Mexico" required class="form-input" autocomplete="off" />
+              <ul class="q-menu" v-if="focusTeam1 && filteredTeam1.length">
+                <li v-for="c in filteredTeam1" :key="c" @mousedown="selectTeam1(c)">{{ c }}</li>
+              </ul>
+            </div>
+
+            <div class="form-group dropdown-container">
+              <label for="team2">Team 2 (Away)</label>
+              <input id="team2" v-model="form.team2" @focus="focusTeam2 = true" @blur="onBlurTeam2" type="text" placeholder="e.g. South Africa" required class="form-input" autocomplete="off" />
+              <ul class="q-menu" v-if="focusTeam2 && filteredTeam2.length">
+                <li v-for="c in filteredTeam2" :key="c" @mousedown="selectTeam2(c)">{{ c }}</li>
+              </ul>
+            </div>
           </div>
 
-          <div class="form-group dropdown-container">
-            <label for="team2">Team 2 (Away)</label>
-            <input id="team2" v-model="form.team2" @focus="focusTeam2 = true" @blur="onBlurTeam2" type="text" placeholder="e.g. South Africa" required class="form-input" autocomplete="off" />
-            <ul class="q-menu" v-if="focusTeam2 && filteredTeam2.length">
-              <li v-for="c in filteredTeam2" :key="c" @mousedown="selectTeam2(c)">{{ c }}</li>
-            </ul>
+          <!-- Post ID & Start Time -->
+          <div class="form-row split">
+            <div class="form-group">
+              <label for="post_id">Post ID</label>
+              <input id="post_id" v-model="form.post_id" type="text" placeholder="e.g. 12345" class="form-input" />
+            </div>
+
+            <div class="form-group">
+              <label for="start_time">Start Time</label>
+              <input id="start_time" v-model="form.start_time" type="datetime-local" class="form-input" />
+            </div>
+          </div>
+
+          <!-- Match End Time -->
+          <div class="form-row split">
+            <div class="form-group">
+              <label for="end_time">Match End Time</label>
+              <input id="end_time" v-model="form.end_time" type="datetime-local" class="form-input" />
+            </div>
           </div>
 
 
@@ -96,7 +119,15 @@ const initialForm = {
   stage: '',
   team1: '',
   team2: '',
-  status: 'upcoming'
+  status: 'upcoming',
+  result: '',
+  winner: '',
+  phone: '',
+  post_id: '',
+  goal_difference: null,
+  start_time: '',
+  end_time: '',
+  participants: ''
 };
 
 const form = reactive({ ...initialForm });
@@ -177,7 +208,16 @@ const handleSubmit = () => {
     return;
   }
 
-  emit('confirm', { ...form });
+  // Format start_time from datetime-local ISO (YYYY-MM-DDTHH:MM) to DB format (YYYY-MM-DD HH:MM:SS)
+  const formattedForm = { ...form };
+  if (formattedForm.start_time) {
+    formattedForm.start_time = formattedForm.start_time.replace('T', ' ');
+  }
+  if (formattedForm.end_time) {
+    formattedForm.end_time = formattedForm.end_time.replace('T', ' ');
+  }
+
+  emit('confirm', formattedForm);
 };
 
 onMounted(() => {

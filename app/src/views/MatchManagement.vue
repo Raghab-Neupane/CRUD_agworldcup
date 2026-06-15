@@ -32,6 +32,9 @@
         <button class="btn-primary" @click="showAddModal = true">
           Add New Match
         </button>
+        <button class="btn-results" @click="showResultsModal = true">
+          View Results
+        </button>
         <button class="btn-refresh" @click="fetchMatches" :disabled="loading" title="Refresh match data">
           Refresh
         </button>
@@ -65,6 +68,8 @@
           @update-status="handleUpdateStatus"
           @update-result="handleUpdateResult"
           @update-match="handleUpdateMatch"
+          @calculate-match="handleCalculateMatch"
+          @show-toast="e => addToast(e.message, e.type)"
         />
       </section>
     </main>
@@ -85,6 +90,13 @@
       @confirm="handleConfirmDelete"
       @cancel="closeDeleteModal"
     />
+
+    <!-- View Results Modal -->
+    <ViewResultsModal
+      :show="showResultsModal"
+      :matches="matches"
+      @close="showResultsModal = false"
+    />
   </div>
 </template>
 
@@ -94,6 +106,7 @@ import matchService from '../services/matchService';
 import AddMatchModal from '../components/AddMatchModal.vue';
 import MatchTable from '../components/MatchTable.vue';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
+import ViewResultsModal from '../components/ViewResultsModal.vue';
 
 // State variables
 const matches = ref([]);
@@ -105,6 +118,7 @@ const activeStatusFilter = ref('all');
 // Modals State
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
+const showResultsModal = ref(false);
 const matchToDelete = ref(null);
 
 let toastIdCounter = 0;
@@ -236,7 +250,72 @@ const handleUpdateMatch = async ({ matchNo, updatedData }) => {
     }
     addToast(`Match #${matchNo} details updated successfully!`, 'success');
   } catch (error) {
-    const errorMsg = error.response?.data?.detail || error.message || 'Failed to update match details';
+    const errorMsg = error.response?.data?.detail || error.message || 'Failed to update match';
+    addToast(errorMsg, 'error');
+  } finally {
+    loading.value = false;
+  }
+};
+
+const handleCalculateMatch = async (match) => {
+  loading.value = true;
+  try {
+    const parts = (match.goal_difference || '').split('-');
+    const g1 = parts[0] !== undefined && parts[0] !== '' ? parseInt(parts[0], 10) : 0;
+    const g2 = parts[1] !== undefined && parts[1] !== '' ? parseInt(parts[1], 10) : 0;
+
+    let winner_team_name = '';
+    let winner_goal = 0;
+    let loser_team_name = '';
+    let loser_goal = 0;
+
+    if (g1 > g2) {
+      winner_team_name = match.team1;
+      winner_goal = g1;
+      loser_team_name = match.team2;
+      loser_goal = g2;
+    } else if (g2 > g1) {
+      winner_team_name = match.team2;
+      winner_goal = g2;
+      loser_team_name = match.team1;
+      loser_goal = g1;
+    } else {
+      // Draw (g1 === g2)
+      if (match.result === 'TEAM2') {
+        winner_team_name = match.team2;
+        winner_goal = g2;
+        loser_team_name = match.team1;
+        loser_goal = g1;
+      } else {
+        winner_team_name = match.team1;
+        winner_goal = g1;
+        loser_team_name = match.team2;
+        loser_goal = g2;
+      }
+    }
+
+    let pid = match.post_id || match.match_no;
+    try {
+      const parsed = parseInt(pid, 10);
+      if (!isNaN(parsed)) {
+        pid = parsed;
+      }
+    } catch (e) {}
+
+    const payload = {
+      post_id: pid,
+      team_1_name: match.team1,
+      team_1_goal: g1,
+      team_2_name: match.team2,
+      team_2_goal: g2,
+      winner_team_name
+    };
+
+    const result = await matchService.calculate(payload);
+    console.log('Calculation outcome:', result);
+    addToast(`Calculated outcome: Winner is ${result.winner_team_name}. Score: ${result.team_1_name} ${result.team_1_goal} - ${result.team_2_goal} ${result.team_2_name}`, 'success');
+  } catch (error) {
+    const errorMsg = error.response?.data?.detail || error.message || 'Failed to calculate match outcomes';
     addToast(errorMsg, 'error');
   } finally {
     loading.value = false;
@@ -348,6 +427,26 @@ body {
 
 .btn-primary:hover {
   background: #1565c0;
+}
+
+.btn-results {
+  background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-results:hover {
+  background: linear-gradient(135deg, #388e3c 0%, #2e7d32 100%);
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.2);
 }
 
 .btn-refresh {
