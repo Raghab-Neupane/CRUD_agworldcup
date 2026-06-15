@@ -1,9 +1,8 @@
 <template>
-  <MatchManagement />
+  <NuxtPage />
 </template>
 
 <script setup>
-import MatchManagement from './src/views/MatchManagement.vue';
 import { setApiBaseUrl } from './src/services/matchService';
 import { useRuntimeConfig } from '#app';
 

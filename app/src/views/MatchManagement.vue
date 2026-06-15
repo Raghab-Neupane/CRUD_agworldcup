@@ -38,6 +38,9 @@
         <button class="btn-refresh" @click="fetchMatches" :disabled="loading" title="Refresh match data">
           Refresh
         </button>
+        <button class="btn-logout" @click="handleLogout" title="Sign Out">
+          Sign Out
+        </button>
       </div>
     </header>
 
@@ -145,6 +148,12 @@ const filterTabs = computed(() => [
   { label: 'Upcoming', value: 'upcoming', count: upcomingCount.value },
   { label: 'Completed', value: 'completed', count: completedCount.value }
 ]);
+
+const handleLogout = () => {
+  const authCookie = useCookie('isAuthenticated');
+  authCookie.value = null;
+  navigateTo('/login');
+};
 
 // API operations
 const fetchMatches = async () => {
@@ -463,7 +472,21 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
 }
+.btn-logout {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
 
+.btn-logout:hover {
+  background: #dc2626;
+}
 /* Main Dashboard content */
 .dashboard-content {
   display: flex;

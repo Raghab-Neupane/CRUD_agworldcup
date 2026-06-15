@@ -104,7 +104,7 @@ export default {
       });
       return response.data;
     }
-    const response = await apiClient.get('/getresult', {
+    const response = await apiClient.get('/winners', {
       params: { post_id: postId }
     });
     return response.data;
