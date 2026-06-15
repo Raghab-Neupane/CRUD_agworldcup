@@ -117,7 +117,7 @@
                 <button class="q-btn-cancel-row" @click="cancelEditing">Cancel</button>
               </div>
               <div v-else class="actions-group">
-                <button class="q-btn-calculate" @click="$emit('calculate-match', match)">Calculate</button>
+                <button class="q-btn-calculate" :disabled="isCalculateDisabled(match)" @click="$emit('calculate-match', match)">Calculate</button>
                 <button class="q-btn-edit-row" @click="startEditing(match)">Edit</button>
                 <button class="q-btn-delete" @click="$emit('request-delete', match.match_no)">Delete</button>
               </div>
@@ -352,6 +352,24 @@ const getTeam1Goal = (goalDiff) => {
 const getTeam2Goal = (goalDiff) => {
   if (!goalDiff || !goalDiff.includes('-')) return '-';
   return goalDiff.split('-')[1];
+};
+
+const isCalculateDisabled = (match) => {
+  if (!match.start_time) return true;
+  
+  let startStr = String(match.start_time).trim();
+  if (startStr.includes(' ')) {
+    startStr = startStr.replace(' ', 'T');
+  }
+  if (!startStr.includes('+') && !startStr.includes('Z')) {
+    // Naive local times are treated as Kathmandu timezone
+    startStr += '+05:45';
+  }
+  
+  const startTime = new Date(startStr);
+  if (isNaN(startTime.getTime())) return true;
+  
+  return startTime > new Date();
 };
 
 // Editing row handlers
@@ -784,6 +802,13 @@ const saveRow = (match) => {
 
 .q-btn-calculate:hover {
   background: #1b5e20;
+}
+
+.q-btn-calculate:disabled {
+  background: #bdc3c7;
+  color: #7f8c8d;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .q-btn-save-row {
