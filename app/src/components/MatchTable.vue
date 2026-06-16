@@ -55,7 +55,8 @@
             <!-- Team 1 column -->
             <td class="text-left text-bold dropdown-container">
               <template v-if="editingMatchNo === match.match_no">
-                <input v-model="editForm.team1" @focus="focusTeam1 = true" @blur="onBlurTeam1" type="text" class="q-edit-input" required autocomplete="off" />
+                <input v-model="editForm.team1" @focus="focusTeam1 = true" @blur="onBlurTeam1" type="text"
+                  class="q-edit-input" required autocomplete="off" />
                 <ul class="q-menu" v-if="focusTeam1 && filteredTeam1.length">
                   <li v-for="c in filteredTeam1" :key="c" @mousedown="selectTeam1(c)">{{ c }}</li>
                 </ul>
@@ -66,7 +67,8 @@
             <!-- Team 2 column -->
             <td class="text-left text-bold dropdown-container">
               <template v-if="editingMatchNo === match.match_no">
-                <input v-model="editForm.team2" @focus="focusTeam2 = true" @blur="onBlurTeam2" type="text" class="q-edit-input" required autocomplete="off" />
+                <input v-model="editForm.team2" @focus="focusTeam2 = true" @blur="onBlurTeam2" type="text"
+                  class="q-edit-input" required autocomplete="off" />
                 <ul class="q-menu" v-if="focusTeam2 && filteredTeam2.length">
                   <li v-for="c in filteredTeam2" :key="c" @mousedown="selectTeam2(c)">{{ c }}</li>
                 </ul>
@@ -79,37 +81,46 @@
 
             <!-- Post ID column -->
             <td class="text-left">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.post_id" type="text" class="q-edit-input" style="max-width: 100px;" />
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.post_id" type="text"
+                class="q-edit-input" style="max-width: 100px;" />
               <span v-else>{{ match.post_id || '-' }}</span>
             </td>
 
             <!-- Team 1 Goal column -->
             <td class="text-left">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.team_1_goal" type="number" min="0" class="q-edit-input" style="max-width: 80px;" placeholder="e.g. 3" />
-              <span v-else>{{ match.team_1_goal !== null && match.team_1_goal !== undefined ? match.team_1_goal : '-' }}</span>
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.team_1_goal" type="number" min="0"
+                class="q-edit-input" style="max-width: 80px;" placeholder="e.g. 3" />
+              <span v-else>{{ match.team_1_goal !== null && match.team_1_goal !== undefined ? match.team_1_goal : '-'
+                }}</span>
             </td>
-            
+
             <!-- Team 2 Goal column -->
             <td class="text-left">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.team_2_goal" type="number" min="0" class="q-edit-input" style="max-width: 80px;" placeholder="e.g. 1" />
-              <span v-else>{{ match.team_2_goal !== null && match.team_2_goal !== undefined ? match.team_2_goal : '-' }}</span>
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.team_2_goal" type="number" min="0"
+                class="q-edit-input" style="max-width: 80px;" placeholder="e.g. 1" />
+              <span v-else>{{ match.team_2_goal !== null && match.team_2_goal !== undefined ? match.team_2_goal : '-'
+                }}</span>
             </td>
 
             <!-- Start Time column -->
             <td class="text-left">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.start_time" type="text" placeholder="YYYY-MM-DD HH:mm:ss" class="q-edit-input" style="max-width: 180px;" />
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.start_time" type="text"
+                placeholder="YYYY-MM-DD HH:mm:ss" class="q-edit-input" style="max-width: 180px;" />
               <span v-else>{{ match.start_time || '-' }}</span>
             </td>
 
             <!-- Match End Time column -->
             <td class="text-left">
-              <input v-if="editingMatchNo === match.match_no" v-model="editForm.end_time" type="text" placeholder="YYYY-MM-DD HH:mm:ss" class="q-edit-input" style="max-width: 180px;" />
+              <input v-if="editingMatchNo === match.match_no" v-model="editForm.end_time" type="text"
+                placeholder="YYYY-MM-DD HH:mm:ss" class="q-edit-input" style="max-width: 180px;" />
               <span v-else>{{ match.end_time || '-' }}</span>
             </td>
 
             <!-- Select toggle column -->
             <td class="text-center">
-              <div :class="['select-toggle-switch', { checked: selectedMatchId === match.match_no }]" @click="toggleSelect(match)"></div>
+              <div :class="['select-toggle-switch', { checked: selectedMatchId === match.match_no }]"
+                @click="toggleSelect(match)">
+              </div>
             </td>
             <td class="text-right actions-cell">
               <div v-if="editingMatchNo === match.match_no" class="actions-group">
@@ -117,7 +128,8 @@
                 <button class="q-btn-cancel-row" @click="cancelEditing">Cancel</button>
               </div>
               <div v-else class="actions-group">
-                <button class="q-btn-calculate" :disabled="isCalculateDisabled(match)" @click="$emit('calculate-match', match)">Calculate</button>
+                <button class="q-btn-calculate" :disabled="isCalculateDisabled(match)"
+                  @click="$emit('calculate-match', match)">Calculate</button>
                 <button class="q-btn-edit-row" @click="startEditing(match)">Edit</button>
                 <button class="q-btn-delete" @click="$emit('request-delete', match.match_no)">Delete</button>
               </div>
@@ -170,10 +182,6 @@ const props = defineProps({
   matches: {
     type: Array,
     required: true,
-  },
-  activeStatusFilter: {
-    type: String,
-    default: 'all',
   },
   calculatedMatchNos: {
     type: Array,
@@ -361,7 +369,7 @@ const getTeam2Goal = (goalDiff) => {
 const isCalculateDisabled = (match) => {
   if (props.calculatedMatchNos.includes(match.match_no)) return true;
   if (!match.end_time) return true;
-  
+
   let endStr = String(match.end_time).trim();
   if (endStr.includes(' ')) {
     endStr = endStr.replace(' ', 'T');
@@ -370,10 +378,10 @@ const isCalculateDisabled = (match) => {
     // Naive local times are treated as Kathmandu timezone
     endStr += '+05:45';
   }
-  
+
   const endTime = new Date(endStr);
   if (isNaN(endTime.getTime())) return true;
-  
+
   return endTime > new Date();
 };
 
@@ -945,16 +953,24 @@ const saveRow = (match) => {
   color: #757575;
   padding: 0 4px;
 }
+
 @media (max-width: 600px) {
-  .table-top-bar, .q-table-footer {
+
+  .table-top-bar,
+  .q-table-footer {
     padding: 6px 8px;
     gap: 6px;
   }
-  .q-table th, .q-table td {
+
+  .q-table th,
+  .q-table td {
     padding: 6px 8px;
     font-size: 0.75rem;
   }
-  .q-input, .q-select, .q-per-page {
+
+  .q-input,
+  .q-select,
+  .q-per-page {
     width: 100%;
     max-width: 150px;
   }

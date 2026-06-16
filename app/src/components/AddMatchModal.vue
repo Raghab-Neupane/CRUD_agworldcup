@@ -9,7 +9,8 @@
           <button class="close-btn" @click="$emit('cancel')">&times;</button>
         </div>
 
-        <form @submit.prevent="handleSubmit" class="modal-form">
+
+        <form v-if="activeTab === 'single'" @submit.prevent="handleSubmit" class="modal-form">
           <div v-if="errorMsg" class="form-error-alert">
             <span class="alert-text">{{ errorMsg }}</span>
           </div>
@@ -45,7 +46,8 @@
           <div class="form-row split">
             <div class="form-group dropdown-container">
               <label for="team1">Team 1 (Home)</label>
-              <input id="team1" v-model="form.team1" @focus="focusTeam1 = true" @blur="onBlurTeam1" type="text" placeholder="e.g. Mexico" required class="form-input" autocomplete="off" />
+              <input id="team1" v-model="form.team1" @focus="focusTeam1 = true" @blur="onBlurTeam1" type="text"
+                placeholder="e.g. Mexico" required class="form-input" autocomplete="off" />
               <ul class="q-menu" v-if="focusTeam1 && filteredTeam1.length">
                 <li v-for="c in filteredTeam1" :key="c" @mousedown="selectTeam1(c)">{{ c }}</li>
               </ul>
@@ -53,7 +55,8 @@
 
             <div class="form-group dropdown-container">
               <label for="team2">Team 2 (Away)</label>
-              <input id="team2" v-model="form.team2" @focus="focusTeam2 = true" @blur="onBlurTeam2" type="text" placeholder="e.g. South Africa" required class="form-input" autocomplete="off" />
+              <input id="team2" v-model="form.team2" @focus="focusTeam2 = true" @blur="onBlurTeam2" type="text"
+                placeholder="e.g. South Africa" required class="form-input" autocomplete="off" />
               <ul class="q-menu" v-if="focusTeam2 && filteredTeam2.length">
                 <li v-for="c in filteredTeam2" :key="c" @mousedown="selectTeam2(c)">{{ c }}</li>
               </ul>
@@ -69,7 +72,8 @@
 
             <div class="form-group">
               <label for="start_time">Start Time</label>
-              <input id="start_time" v-model="form.start_time" type="text" placeholder="YYYY-MM-DD HH:mm:ss" class="form-input" />
+              <input id="start_time" v-model="form.start_time" type="text" placeholder="YYYY-MM-DD HH:mm:ss"
+                class="form-input" />
             </div>
           </div>
 
@@ -77,7 +81,8 @@
           <div class="form-row split">
             <div class="form-group">
               <label for="end_time">Match End Time</label>
-              <input id="end_time" v-model="form.end_time" type="text" placeholder="YYYY-MM-DD HH:mm:ss" class="form-input" />
+              <input id="end_time" v-model="form.end_time" type="text" placeholder="YYYY-MM-DD HH:mm:ss"
+                class="form-input" />
             </div>
           </div>
 
@@ -91,6 +96,33 @@
             </button>
           </div>
         </form>
+
+        <div v-else class="modal-form">
+          <div class="form-group">
+            <label for="bulk-json">Paste JSON Array of Matches</label>
+            <textarea id="bulk-json" v-model="bulkJsonText"
+              placeholder='[&#10;  {&#10;    "match_no": 1,&#10;    "stage": "Group A",&#10;    "team1": "Mexico",&#10;    "team2": "South Africa",&#10;    "team_1_goal": 2,&#10;    "team_2_goal": 1,&#10;    "start_time": "2026-06-16 11:00:00",&#10;    "end_time": "2026-06-16 13:00:00"&#10;  }&#10;]'
+              class="form-textarea" @input="validateBulkJson"></textarea>
+          </div>
+
+          <div class="validation-feedback" v-if="bulkJsonText.trim()">
+            <div v-if="isBulkValid" class="validation-status success">
+              JSON format is correct. Detected <strong>{{ bulkDetectedCount }}</strong> match(es).
+            </div>
+            <div v-else class="validation-status error">
+              {{ bulkValidationError }}
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="$emit('cancel')">Cancel</button>
+            <button type="button" class="btn btn-primary" :disabled="!isBulkValid || bulkDetectedCount === 0 || loading"
+              @click="handleBulkSubmit">
+              <span v-if="loading" class="spinner-small"></span>
+              {{ loading ? 'Saving...' : 'Bulk Insert' }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </Transition>
@@ -110,9 +142,15 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['confirm', 'cancel']);
+const emit = defineEmits(['confirm', 'cancel', 'bulk-confirm']);
 
 import countries from '../data/countries.json';
+
+const activeTab = ref('single');
+const bulkJsonText = ref('');
+const isBulkValid = ref(false);
+const bulkDetectedCount = ref(0);
+const bulkValidationError = ref('');
 
 const initialForm = {
   match_no: null,
@@ -184,6 +222,11 @@ const getKathmanduNow = () => {
 // Reset form when modal opens
 watch(() => props.show, (newVal) => {
   if (newVal) {
+    activeTab.value = 'single';
+    bulkJsonText.value = '';
+    isBulkValid.value = false;
+    bulkDetectedCount.value = 0;
+    bulkValidationError.value = '';
     Object.assign(form, initialForm);
     const nowKtm = getKathmanduNow();
     form.start_time = nowKtm;
@@ -232,6 +275,65 @@ const handleSubmit = () => {
   if (!formattedForm.end_time) formattedForm.end_time = null;
 
   emit('confirm', formattedForm);
+};
+
+const validateBulkJson = () => {
+  const content = bulkJsonText.value.trim();
+  if (!content) {
+    isBulkValid.value = false;
+    bulkDetectedCount.value = 0;
+    bulkValidationError.value = '';
+    return;
+  }
+  try {
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) {
+      throw new Error('JSON input must be a JSON Array [ ... ]');
+    }
+    if (parsed.length === 0) {
+      throw new Error('Array cannot be empty');
+    }
+    for (let i = 0; i < parsed.length; i++) {
+      const item = parsed[i];
+      if (typeof item !== 'object' || item === null) {
+        throw new Error(`Item at index ${i} is not a valid object`);
+      }
+      if (!('match_no' in item) || item.match_no === undefined || item.match_no === null) {
+        throw new Error(`Item at index ${i} is missing "match_no"`);
+      }
+      if (isNaN(Number(item.match_no))) {
+        throw new Error(`Item at index ${i} has an invalid "match_no" (must be a number)`);
+      }
+      if (!item.stage || typeof item.stage !== 'string') {
+        throw new Error(`Item at index ${i} is missing or has an invalid "stage"`);
+      }
+      if (!item.team1 || typeof item.team1 !== 'string') {
+        throw new Error(`Item at index ${i} is missing or has an invalid "team1"`);
+      }
+      if (!item.team2 || typeof item.team2 !== 'string') {
+        throw new Error(`Item at index ${i} is missing or has an invalid "team2"`);
+      }
+    }
+    isBulkValid.value = true;
+    bulkDetectedCount.value = parsed.length;
+    bulkValidationError.value = '';
+  } catch (err) {
+    isBulkValid.value = false;
+    bulkDetectedCount.value = 0;
+    bulkValidationError.value = err.message;
+  }
+};
+
+const handleBulkSubmit = () => {
+  validateBulkJson();
+  if (isBulkValid.value && bulkDetectedCount.value > 0) {
+    try {
+      const parsed = JSON.parse(bulkJsonText.value.trim());
+      emit('bulk-confirm', parsed);
+    } catch (err) {
+      bulkValidationError.value = 'Failed to parse JSON before submission';
+    }
+  }
 };
 
 onMounted(() => {
@@ -459,5 +561,75 @@ onUnmounted(() => {
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
+}
+
+.modal-tabs {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+  gap: 16px;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.tab-btn.active {
+  color: #1976d2;
+  border-bottom-color: #1976d2;
+}
+
+.form-textarea {
+  width: 100%;
+  height: 160px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: #1e293b;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
+  resize: vertical;
+  line-height: 1.5;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-textarea:focus {
+  border-color: #1976d2;
+}
+
+.validation-feedback {
+  margin-top: 10px;
+}
+
+.validation-status {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.validation-status.success {
+  background: #e6f4ea;
+  border: 1px solid #a3cfbb;
+  color: #137333;
+}
+
+.validation-status.error {
+  background: #fce8e6;
+  border: 1px solid #f5c2c7;
+  color: #c5221f;
 }
 </style>

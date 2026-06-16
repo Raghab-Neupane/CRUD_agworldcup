@@ -172,9 +172,7 @@ const completedCount = computed(() => matches.value.filter(m => m.status === 'co
 
 // Status filter tabs definitions
 const filterTabs = computed(() => [
-  { label: 'All Matches', value: 'all', count: matches.value.length },
-  { label: 'Upcoming', value: 'upcoming', count: upcomingCount.value },
-  { label: 'Completed', value: 'completed', count: completedCount.value }
+  { label: 'All Matches', value: 'all', count: matches.value.length }
 ]);
 
 const handleLogout = () => {
@@ -219,7 +217,63 @@ const handleConfirmBulkAdd = async (matchesList) => {
 
   for (const newMatchData of matchesList) {
     try {
-      await matchService.addMatch(newMatchData);
+      const cleanedData = { ...newMatchData };
+
+      // Map variations of key names to standard model property names
+      if ('team1_goal' in cleanedData) {
+        cleanedData.team_1_goal = cleanedData.team1_goal;
+        delete cleanedData.team1_goal;
+      }
+      if ('team2_goal' in cleanedData) {
+        cleanedData.team_2_goal = cleanedData.team2_goal;
+        delete cleanedData.team2_goal;
+      }
+
+      // Sanitize team_1_goal
+      if (cleanedData.team_1_goal === '' || cleanedData.team_1_goal === null || cleanedData.team_1_goal === undefined) {
+        cleanedData.team_1_goal = null;
+      } else {
+        cleanedData.team_1_goal = Number(cleanedData.team_1_goal);
+      }
+
+      // Sanitize team_2_goal
+      if (cleanedData.team_2_goal === '' || cleanedData.team_2_goal === null || cleanedData.team_2_goal === undefined) {
+        cleanedData.team_2_goal = null;
+      } else {
+        cleanedData.team_2_goal = Number(cleanedData.team_2_goal);
+      }
+
+      // Sanitize post_id
+      if (cleanedData.post_id !== undefined && cleanedData.post_id !== null) {
+        cleanedData.post_id = String(cleanedData.post_id).trim();
+        if (cleanedData.post_id === '') {
+          cleanedData.post_id = null;
+        }
+      } else {
+        cleanedData.post_id = null;
+      }
+
+      // Sanitize start_time
+      if (cleanedData.start_time !== undefined && cleanedData.start_time !== null) {
+        cleanedData.start_time = String(cleanedData.start_time).trim();
+        if (cleanedData.start_time === '') {
+          cleanedData.start_time = null;
+        }
+      } else {
+        cleanedData.start_time = null;
+      }
+
+      // Sanitize end_time
+      if (cleanedData.end_time !== undefined && cleanedData.end_time !== null) {
+        cleanedData.end_time = String(cleanedData.end_time).trim();
+        if (cleanedData.end_time === '') {
+          cleanedData.end_time = null;
+        }
+      } else {
+        cleanedData.end_time = null;
+      }
+
+      await matchService.addMatch(cleanedData);
       insertedCount++;
     } catch (error) {
       failedCount++;
