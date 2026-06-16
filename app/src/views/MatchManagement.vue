@@ -67,6 +67,7 @@
         <MatchTable
           :matches="matches"
           :active-status-filter="activeStatusFilter"
+          :calculated-match-nos="calculatedMatchNos"
           @request-delete="triggerDeleteConfirmation"
           @update-status="handleUpdateStatus"
           @update-match="handleUpdateMatch"
@@ -116,6 +117,33 @@ const loading = ref(false);
 const modalActionLoading = ref(false);
 const toasts = ref([]);
 const activeStatusFilter = ref('all');
+const calculatedMatchNos = ref([]);
+
+const loadCalculatedMatches = () => {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('calculatedMatches');
+      if (stored) {
+        calculatedMatchNos.value = JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('Failed to parse calculated matches from localStorage:', e);
+    }
+  }
+};
+
+const markMatchAsCalculated = (matchNo) => {
+  if (!calculatedMatchNos.value.includes(matchNo)) {
+    calculatedMatchNos.value.push(matchNo);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('calculatedMatches', JSON.stringify(calculatedMatchNos.value));
+      } catch (e) {
+        console.error('Failed to save calculated matches to localStorage:', e);
+      }
+    }
+  }
+};
 
 // Modals State
 const showAddModal = ref(false);
@@ -312,6 +340,7 @@ const handleCalculateMatch = async (match) => {
     const config = useRuntimeConfig();
     const result = await matchService.calculate(payload, config.public.calcServiceUrl);
     console.log('Calculation outcome:', result);
+    markMatchAsCalculated(match.match_no);
     addToast('Calculated result successfully.', 'success');
   } catch (error) {
     const errorMsg = error.response?.data?.detail || error.message || 'Failed to calculate match outcomes';
@@ -350,6 +379,7 @@ const handleConfirmDelete = async () => {
 };
 
 onMounted(() => {
+  loadCalculatedMatches();
   fetchMatches();
 });
 </script>

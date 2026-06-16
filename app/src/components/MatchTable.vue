@@ -174,6 +174,10 @@ const props = defineProps({
   activeStatusFilter: {
     type: String,
     default: 'all',
+  },
+  calculatedMatchNos: {
+    type: Array,
+    default: () => []
   }
 });
 
@@ -355,21 +359,22 @@ const getTeam2Goal = (goalDiff) => {
 };
 
 const isCalculateDisabled = (match) => {
-  if (!match.start_time) return true;
+  if (props.calculatedMatchNos.includes(match.match_no)) return true;
+  if (!match.end_time) return true;
   
-  let startStr = String(match.start_time).trim();
-  if (startStr.includes(' ')) {
-    startStr = startStr.replace(' ', 'T');
+  let endStr = String(match.end_time).trim();
+  if (endStr.includes(' ')) {
+    endStr = endStr.replace(' ', 'T');
   }
-  if (!startStr.includes('+') && !startStr.includes('Z')) {
+  if (!endStr.includes('+') && !endStr.includes('Z')) {
     // Naive local times are treated as Kathmandu timezone
-    startStr += '+05:45';
+    endStr += '+05:45';
   }
   
-  const startTime = new Date(startStr);
-  if (isNaN(startTime.getTime())) return true;
+  const endTime = new Date(endStr);
+  if (isNaN(endTime.getTime())) return true;
   
-  return startTime > new Date();
+  return endTime > new Date();
 };
 
 // Editing row handlers
