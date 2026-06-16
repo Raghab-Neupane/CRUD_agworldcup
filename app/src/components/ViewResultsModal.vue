@@ -35,7 +35,7 @@
                 <div class="winner-box">
                   <div class="winner-info-left">
                     <span class="winner-label">Winner</span>
-                    <h3 class="winner-name">{{ resultDetails.winner_name || 'Not Decided yet' }}</h3>
+                    <h3 class="winner-name">{{ resultDetails.winner_name || 'No correct guess!' }}</h3>
                     <p class="winner-phone" v-if="resultDetails.winner_name && resultDetails.winner_phone">
                       📞 {{ resultDetails.winner_phone }}
                     </p>
@@ -49,24 +49,55 @@
 
                 <!-- Participants Section -->
                 <div class="participants-section">
+                  <div class="results-tabs">
+                    <button class="tab-btn" :class="{ active: activeTab === 'participants' }"
+                      @click="activeTab = 'participants'">
+                      Participants ({{ participantsList.length }})
+                    </button>
+                    <button class="tab-btn" :class="{ active: activeTab === 'comments' }"
+                      @click="activeTab = 'comments'">
+                      Other comments ({{ otherCommentsList.length }})
+                    </button>
+                  </div>
+
                   <div v-if="loadingResult" style="padding: 10px; color: #64748b; font-style: italic;">
                     Loading results...
                   </div>
                   <template v-else>
-                    <h5>Participants ({{ participantsList.length }})</h5>
-                    <div class="participants-table-list" v-if="participantsList.length">
-                      <div v-for="(p, idx) in participantsList" :key="idx" class="participant-table-row">
-                        <div class="p-info">
-                          <span class="p-index">{{ idx + 1 }}</span>
-                          <span class="p-name-bold">{{ p.name }}</span>
-                          <span class="p-phone-light" v-if="p.mobile_number">({{ p.mobile_number }})</span>
-                        </div>
-                        <div class="p-points">
-                          <span class="pts-badge participant-pts">{{ p.point }} Points</span>
+                    <!-- Participants Tab Content -->
+                    <div v-if="activeTab === 'participants'">
+                      <div class="participants-table-list" v-if="participantsList.length">
+                        <div v-for="(p, idx) in participantsList" :key="idx" class="participant-table-row">
+                          <div class="p-info">
+                            <span class="p-index">{{ idx + 1 }}</span>
+                            <span class="p-name-bold">{{ p.name }}</span>
+                            <span class="p-phone-light" v-if="p.mobile_number">({{ p.mobile_number }})</span>
+                          </div>
+                          <div class="p-points">
+                            <span class="pts-badge participant-pts">{{ p.point }} Points</span>
+                          </div>
                         </div>
                       </div>
+                      <p class="no-participants" v-else>No participants listed for this match.</p>
                     </div>
-                    <p class="no-participants" v-else>No participants listed for this match.</p>
+
+                    <!-- Other Comments Tab Content -->
+                    <div v-if="activeTab === 'comments'">
+                      <div class="participants-table-list" v-if="otherCommentsList.length">
+                        <div v-for="(p, idx) in otherCommentsList" :key="idx" class="participant-table-row">
+                          <div class="p-info">
+                            <span class="p-index">{{ idx + 1 }}</span>
+                            <span class="p-name-bold">{{ p.name }}</span>
+                            <span class="p-phone-light" v-if="p.mobile_number">({{ p.mobile_number }})</span>
+                          </div>
+                          <div class="p-comment"
+                            style="color: #475569; font-size: 0.88rem; font-weight: 500; text-align: right; max-width: 40%; word-break: break-word;">
+                            {{ p.comment || 'N/A' }}
+                          </div>
+                        </div>
+                      </div>
+                      <p class="no-participants" v-else>No other comments found.</p>
+                    </div>
                   </template>
                 </div>
               </div>
@@ -91,6 +122,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import matchService from '../services/matchService';
+import sampleCommentsData from '../data/samplecomments.json';
 
 const props = defineProps({
   show: {
@@ -105,13 +137,18 @@ const props = defineProps({
 
 defineEmits(['close']);
 
+const config = useRuntimeConfig();
+
+const activeTab = ref('participants');
 const selectedMatch = ref(null);
 const resultDetails = ref({
   winner_name: '',
   winner_phone: '',
   winner_point: 0,
   participants: '',
-  participants_list: []
+  participants_list: [],
+  othercomments: '',
+  othercomments_list: []
 });
 const loadingResult = ref(false);
 
@@ -120,38 +157,92 @@ const matchesWithPostId = computed(() => {
   return props.matches.filter(m => m.post_id && m.post_id.trim() !== '');
 });
 
-// TODO: Replace the static JSON import with an environment variable pointing to the result endpoint.
-// const fetchData = ... (remove this line when using the real API)
-// Removed static fetchData import; fetching results from API
-
-// Fetches result details from the backend endpoint defined in an environment variable.
-// Replace the dummy implementation below with a call to the API, e.g.:
-// const fetchResultDetails = async (postId) => {
-//   const endpoint = import.meta.env.VITE_RESULT_ENDPOINT; // adjust as needed
-//   const res = await fetch(`${endpoint}/${postId}`);
-//   const data = await res.json();
-//   resultDetails.value = {
-//     winner_name: data.winner?.name || '',
-//     winner_phone: data.winner?.mobile_number || '',
-//     winner_point: data.winner?.point || 0,
-const fetchResultDetails = async (postId) => {
+// Fetches both results and other comments concurrently using Promise.allSettled
+const fetchResultAndComments = async (postId) => {
   loadingResult.value = true;
   try {
-    const config = useRuntimeConfig();
-    const data = await matchService.getResult(postId, config.public.getresultServiceUrl);
-    resultDetails.value = {
-      winner_name: data.winner?.name || '',
-      winner_phone: data.winner?.mobile_number || '',
-      winner_point: data.winner?.points !== undefined ? data.winner.points : (data.winner?.point || 0),
+    // Fetch result details from the backend endpoint defined in config.public.getresultServiceUrl
+    const serviceUrl = config?.public?.getresultServiceUrl || '';
+    let resResult = { status: 'rejected', reason: 'No service URL configured' };
+
+    if (serviceUrl) {
+      const [settledResult] = await Promise.allSettled([
+        matchService.getResult(postId, serviceUrl)
+      ]);
+      resResult = settledResult;
+    }
+
+    const newDetails = {
+      winner_name: '',
+      winner_phone: '',
+      winner_point: 0,
       participants: '',
-      participants_list: (data.participants || []).map(p => ({
+      participants_list: [],
+      othercomments: '',
+      othercomments_list: []
+    };
+
+    if (resResult.status === 'fulfilled') {
+      const data = resResult.value;
+      newDetails.winner_name = data.winner?.name || '';
+      newDetails.winner_phone = data.winner?.mobile_number || '';
+      newDetails.winner_point = data.winner?.points !== undefined ? data.winner.points : (data.winner?.point || 0);
+      newDetails.participants_list = (data.participants || []).map(p => ({
         ...p,
         point: p.points !== undefined ? p.points : (p.point || 0)
-      }))
-    };
+      }));
+    } else {
+      console.error('Failed to fetch result details', resResult.reason);
+    }
+
+    // Commented out backend comments fetching for now as requested
+    /*
+    const [resComments] = await Promise.allSettled([
+      matchService.getComments(postId, config.public.getcommentsServiceUrl)
+    ]);
+    if (resComments.status === 'fulfilled') {
+      const data = resComments.value;
+      newDetails.othercomments = data.comments || '';
+      newDetails.othercomments_list = Array.isArray(data.comments) ? data.comments.map(c => ({
+        name: typeof c === 'string' ? c : (c.name || ''),
+        mobile_number: typeof c === 'string' ? '' : (c.mobile_number || c.phone || c.mobile || '')
+      })) : [];
+    } else {
+      console.error('Failed to fetch other comments', resComments.reason);
+    }
+    */
+
+    // For now, load sample data from samplecomments.json
+    let commentsData = [];
+    const sourceData = sampleCommentsData && sampleCommentsData.default ? sampleCommentsData.default : sampleCommentsData;
+    console.log('sourceData loaded from JSON:', sourceData);
+    
+    if (sourceData) {
+      if (sourceData['other-participants']) {
+        commentsData = sourceData['other-participants'];
+      } else if (sourceData['other_participants']) {
+        commentsData = sourceData['other_participants'];
+      } else if (Array.isArray(sourceData)) {
+        commentsData = sourceData;
+      } else {
+        // Find any array property inside the JSON object
+        const arrayKey = Object.keys(sourceData).find(key => Array.isArray(sourceData[key]));
+        if (arrayKey) {
+          commentsData = sourceData[arrayKey];
+        }
+      }
+    }
+    console.log('Resolved commentsData array:', commentsData);
+
+    newDetails.othercomments_list = commentsData.map(c => ({
+      name: c.name || '',
+      mobile_number: c.mobile_number || '',
+      comment: c.comment || c.comments || ''
+    }));
+
+    resultDetails.value = newDetails;
   } catch (e) {
-    console.error('Failed to fetch result details', e);
-    resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '', participants_list: [] };
+    console.error('Failed to fetch result and comments', e);
   } finally {
     loadingResult.value = false;
   }
@@ -161,10 +252,11 @@ const fetchResultDetails = async (postId) => {
 watch(
   () => selectedMatch.value,
   (newVal) => {
+    activeTab.value = 'participants';
     if (newVal) {
-      fetchResultDetails(newVal.post_id);
+      fetchResultAndComments(newVal.post_id);
     } else {
-      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '' };
+      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '', participants_list: [], othercomments: '', othercomments_list: [] };
     }
   }
 );
@@ -173,11 +265,12 @@ watch(
 watch(
   () => props.show,
   (newVal) => {
+    activeTab.value = 'participants';
     if (newVal && matchesWithPostId.value.length) {
       selectedMatch.value = matchesWithPostId.value[0];
     } else if (!newVal) {
       selectedMatch.value = null;
-      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '' };
+      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '', participants_list: [], othercomments: '', othercomments_list: [] };
     }
   },
   { immediate: true }
@@ -194,6 +287,27 @@ const participantsList = computed(() => {
     .map(p => p.trim())
     .filter(p => p.length > 0)
     .map(name => ({ name, phone: '' }));
+});
+
+// Computed property to get other comments formatted list
+const otherCommentsList = computed(() => {
+  if (resultDetails.value.othercomments_list && resultDetails.value.othercomments_list.length > 0) {
+    return resultDetails.value.othercomments_list;
+  }
+  if (Array.isArray(resultDetails.value.othercomments) && resultDetails.value.othercomments.length > 0) {
+    return resultDetails.value.othercomments.map(c => ({
+      name: typeof c === 'string' ? c : (c.name || ''),
+      mobile_number: typeof c === 'string' ? '' : (c.mobile_number || c.phone || c.mobile || '')
+    }));
+  }
+  if (typeof resultDetails.value.othercomments === 'string' && resultDetails.value.othercomments.trim() !== '') {
+    return resultDetails.value.othercomments
+      .split(',')
+      .map(p => p.trim())
+      .filter(p => p.length > 0)
+      .map(name => ({ name, mobile_number: '' }));
+  }
+  return [];
 });
 </script>
 
@@ -216,11 +330,12 @@ const participantsList = computed(() => {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   width: 95%;
-  max-width: 850px;
-  padding: 24px;
+  max-width: 1100px;
+  height: 80vh;
+  padding: 28px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   color: #1e293b;
-  max-height: 85vh;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
 }
@@ -265,7 +380,7 @@ const participantsList = computed(() => {
 /* Results grid layout */
 .results-layout {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 260px 1fr;
   gap: 20px;
   min-height: 350px;
 }
@@ -292,7 +407,7 @@ const participantsList = computed(() => {
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
-  max-height: 320px;
+  max-height: 480px;
 }
 
 .post-item-btn {
@@ -374,7 +489,7 @@ const participantsList = computed(() => {
   justify-content: space-between;
   align-items: center;
 }
- 
+
 .winner-info-left {
   display: flex;
   flex-direction: column;
@@ -384,7 +499,7 @@ const participantsList = computed(() => {
   display: flex;
   align-items: center;
 }
- 
+
 .winner-label {
   font-size: 0.75rem;
   font-weight: 700;
@@ -393,14 +508,14 @@ const participantsList = computed(() => {
   letter-spacing: 0.05em;
   margin-bottom: 2px;
 }
- 
+
 .winner-name {
   margin: 0 0 2px 0;
   font-size: 1.2rem;
   font-weight: 700;
   color: #0f172a;
 }
- 
+
 .winner-phone {
   margin: 0;
   font-size: 0.85rem;
@@ -434,7 +549,7 @@ const participantsList = computed(() => {
   background: #e2e8f0;
   margin: 16px 0;
 }
- 
+
 .participants-section h5 {
   margin: 0 0 10px 0;
   font-size: 0.95rem;
@@ -443,16 +558,16 @@ const participantsList = computed(() => {
   border-bottom: 1px solid #f1f5f9;
   padding-bottom: 6px;
 }
- 
+
 .participants-table-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 220px;
+  max-height: 380px;
   overflow-y: auto;
   padding: 2px;
 }
- 
+
 .participant-table-row {
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
@@ -532,6 +647,36 @@ const participantsList = computed(() => {
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
+}
+
+
+.results-tabs {
+  display: flex;
+  gap: 12px;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 16px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+  color: #1e293b;
+}
+
+.tab-btn.active {
+  color: #1976d2;
+  border-bottom-color: #1976d2;
 }
 
 @media (max-width: 580px) {
