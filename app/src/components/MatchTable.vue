@@ -189,7 +189,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['request-delete', 'update-status', 'update-match', 'calculate-match', 'show-toast']);
+const emit = defineEmits(['request-delete', 'update-status', 'update-match', 'calculate-match', 'show-toast', 'refresh-matches']);
 
 // New state for selected match toggle
 const selectedMatchId = ref(null);
@@ -198,6 +198,8 @@ watch(() => props.matches, (newMatches) => {
   const selected = newMatches.find(m => m.is_selected);
   if (selected) {
     selectedMatchId.value = selected.match_no;
+  } else {
+    selectedMatchId.value = null;
   }
 }, { immediate: true, deep: true });
 
@@ -207,8 +209,9 @@ const toggleSelect = async (match) => {
     // Deselect current match
     selectedMatchId.value = null;
     try {
-      await matchService.updateSelectedMatch(match.match_no, { winner: null, phone: null });
+      await matchService.updateSelectedMatch(null, { winner: null, phone: null });
       emit('show-toast', { message: `Deselected Match #${match.match_no}.`, type: 'info' });
+      emit('refresh-matches');
     } catch (e) {
       console.error('Failed to deselect match', e);
     }
@@ -218,6 +221,7 @@ const toggleSelect = async (match) => {
     try {
       await matchService.updateSelectedMatch(match.match_no, { winner: match.winner, phone: match.phone });
       emit('show-toast', { message: `Selected Match #${match.match_no} as active match!`, type: 'success' });
+      emit('refresh-matches');
     } catch (e) {
       console.error('Failed to update selected match', e);
     }

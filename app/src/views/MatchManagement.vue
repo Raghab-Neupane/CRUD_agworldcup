@@ -60,7 +60,7 @@
         <MatchTable :matches="matches" :active-status-filter="activeStatusFilter"
           :calculated-match-nos="calculatedMatchNos" @request-delete="triggerDeleteConfirmation"
           @update-status="handleUpdateStatus" @update-match="handleUpdateMatch" @calculate-match="handleCalculateMatch"
-          @show-toast="e => addToast(e.message, e.type)" />
+          @show-toast="e => addToast(e.message, e.type)" @refresh-matches="fetchMatches" />
       </section>
     </main>
 
