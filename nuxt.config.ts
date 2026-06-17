@@ -7,8 +7,8 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:8000',
-      appUrl: process.env.NUXT_PUBLIC_APP_URL || 'http://localhost:3001',
+      apiBase: process.env.NUXT_PUBLIC_API_BASE_URL || '',
+      appUrl: process.env.NUXT_PUBLIC_APP_URL || '',
       assetsUrl: process.env.NUXT_PUBLIC_ASSETS_URL || '',
       calcServiceUrl: process.env.NUXT_PUBLIC_CALC_SERVICE_URL || '',
       getresultServiceUrl: process.env.NUXT_PUBLIC_GETRESULT_SERVICE_URL || '',
