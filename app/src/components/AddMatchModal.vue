@@ -10,6 +10,26 @@
         </div>
 
 
+        <!-- Tabs for Single vs Bulk Add -->
+        <div class="modal-tabs">
+          <button 
+            type="button" 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'single' }" 
+            @click="activeTab = 'single'"
+          >
+            Single Match
+          </button>
+          <button 
+            type="button" 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'bulk' }" 
+            @click="activeTab = 'bulk'"
+          >
+            Bulk Insert
+          </button>
+        </div>
+
         <form v-if="activeTab === 'single'" @submit.prevent="handleSubmit" class="modal-form">
           <div v-if="errorMsg" class="form-error-alert">
             <span class="alert-text">{{ errorMsg }}</span>

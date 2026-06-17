@@ -35,12 +35,20 @@
                 <div class="winner-box">
                   <div class="winner-info-left">
                     <span class="winner-label">Winner</span>
-                    <h3 class="winner-name">{{ resultDetails.winner_name || 'No correct guess!' }}</h3>
-                    <p class="winner-phone" v-if="resultDetails.winner_name && resultDetails.winner_phone">
+                    <h3 class="winner-name">
+                      <template v-if="!isCalculated">
+                        Please calculate at first!
+                      </template>
+                      <template v-else>
+                        {{ resultDetails.winner_name || 'No correct guess!' }}
+                      </template>
+                    </h3>
+                    <p class="winner-phone"
+                      v-if="isCalculated && resultDetails.winner_name && resultDetails.winner_phone">
                       📞 {{ resultDetails.winner_phone }}
                     </p>
                   </div>
-                  <div class="winner-info-right" v-if="resultDetails.winner_name">
+                  <div class="winner-info-right" v-if="isCalculated && resultDetails.winner_name">
                     <span class="pts-badge winner-pts">{{ resultDetails.winner_point }} Points</span>
                   </div>
                 </div>
@@ -49,55 +57,36 @@
 
                 <!-- Participants Section -->
                 <div class="participants-section">
-                  <div class="results-tabs">
-                    <button class="tab-btn" :class="{ active: activeTab === 'participants' }"
-                      @click="activeTab = 'participants'">
-                      Participants ({{ participantsList.length }})
-                    </button>
-                    <button class="tab-btn" :class="{ active: activeTab === 'comments' }"
-                      @click="activeTab = 'comments'">
-                      Other comments ({{ otherCommentsList.length }})
-                    </button>
-                  </div>
-
                   <div v-if="loadingResult" style="padding: 10px; color: #64748b; font-style: italic;">
                     Loading results...
                   </div>
                   <template v-else>
-                    <!-- Participants Tab Content -->
-                    <div v-if="activeTab === 'participants'">
-                      <div class="participants-table-list" v-if="participantsList.length">
-                        <div v-for="(p, idx) in participantsList" :key="idx" class="participant-table-row">
-                          <div class="p-info">
-                            <span class="p-index">{{ idx + 1 }}</span>
-                            <span class="p-name-bold">{{ p.name }}</span>
-                            <span class="p-phone-light" v-if="p.mobile_number">({{ p.mobile_number }})</span>
-                          </div>
-                          <div class="p-points">
-                            <span class="pts-badge participant-pts">{{ p.point }} Points</span>
-                          </div>
-                        </div>
-                      </div>
-                      <p class="no-participants" v-else>No participants listed for this match.</p>
+                    <!-- Horizontal Tabs Switch -->
+                    <div class="results-tabs">
+                      <button class="tab-btn" :class="{ active: participantFilter === 'full' }"
+                        @click="participantFilter = 'full'">
+                        Full Match ({{participantsList.filter(p => p.point === undefined || p.point >= 10).length}})
+                      </button>
+                      <button class="tab-btn" :class="{ active: participantFilter === 'partial' }"
+                        @click="participantFilter = 'partial'">
+                        Partial Match ({{participantsList.filter(p => p.point !== undefined && p.point < 10).length}})
+                          </button>
                     </div>
 
-                    <!-- Other Comments Tab Content -->
-                    <div v-if="activeTab === 'comments'">
-                      <div class="participants-table-list" v-if="otherCommentsList.length">
-                        <div v-for="(p, idx) in otherCommentsList" :key="idx" class="participant-table-row">
-                          <div class="p-info">
-                            <span class="p-index">{{ idx + 1 }}</span>
-                            <span class="p-name-bold">{{ p.name }}</span>
-                            <span class="p-phone-light" v-if="p.mobile_number">({{ p.mobile_number }})</span>
-                          </div>
-                          <div class="p-comment"
-                            style="color: #475569; font-size: 0.88rem; font-weight: 500; text-align: right; max-width: 40%; word-break: break-word;">
-                            {{ p.comment || 'N/A' }}
-                          </div>
+                    <!-- Participants List -->
+                    <div class="participants-table-list" v-if="filteredParticipants.length">
+                      <div v-for="(p, idx) in filteredParticipants" :key="idx" class="participant-table-row">
+                        <div class="p-info">
+                          <span class="p-index">{{ idx + 1 }}</span>
+                          <span class="p-name-bold">{{ p.name }}</span>
+                          <span class="p-phone-light" v-if="p.mobile_number">({{ p.mobile_number }})</span>
+                        </div>
+                        <div class="p-points">
+                          <span class="pts-badge participant-pts">{{ p.point || 0 }} Points</span>
                         </div>
                       </div>
-                      <p class="no-participants" v-else>No other comments found.</p>
                     </div>
+                    <p class="no-participants" v-else>No participants found for this match type.</p>
                   </template>
                 </div>
               </div>
@@ -112,7 +101,6 @@
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="$emit('close')">Close</button>
         </div>
       </div>
     </div>
@@ -122,7 +110,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import matchService from '../services/matchService';
-import sampleCommentsData from '../data/samplecomments.json';
 
 const props = defineProps({
   show: {
@@ -137,18 +124,14 @@ const props = defineProps({
 
 defineEmits(['close']);
 
-const config = useRuntimeConfig();
-
-const activeTab = ref('participants');
 const selectedMatch = ref(null);
+const participantFilter = ref('full');
 const resultDetails = ref({
   winner_name: '',
   winner_phone: '',
   winner_point: 0,
   participants: '',
-  participants_list: [],
-  othercomments: '',
-  othercomments_list: []
+  participants_list: []
 });
 const loadingResult = ref(false);
 
@@ -157,92 +140,38 @@ const matchesWithPostId = computed(() => {
   return props.matches.filter(m => m.post_id && m.post_id.trim() !== '');
 });
 
-// Fetches both results and other comments concurrently using Promise.allSettled
-const fetchResultAndComments = async (postId) => {
+// TODO: Replace the static JSON import with an environment variable pointing to the result endpoint.
+// const fetchData = ... (remove this line when using the real API)
+// Removed static fetchData import; fetching results from API
+
+// Fetches result details from the backend endpoint defined in an environment variable.
+// Replace the dummy implementation below with a call to the API, e.g.:
+// const fetchResultDetails = async (postId) => {
+//   const endpoint = import.meta.env.VITE_RESULT_ENDPOINT; // adjust as needed
+//   const res = await fetch(`${endpoint}/${postId}`);
+//   const data = await res.json();
+//   resultDetails.value = {
+//     winner_name: data.winner?.name || '',
+//     winner_phone: data.winner?.mobile_number || '',
+//     winner_point: data.winner?.point || 0,
+const fetchResultDetails = async (postId) => {
   loadingResult.value = true;
   try {
-    // Fetch result details from the backend endpoint defined in config.public.getresultServiceUrl
-    const serviceUrl = config?.public?.getresultServiceUrl || '';
-    let resResult = { status: 'rejected', reason: 'No service URL configured' };
-
-    if (serviceUrl) {
-      const [settledResult] = await Promise.allSettled([
-        matchService.getResult(postId, serviceUrl)
-      ]);
-      resResult = settledResult;
-    }
-
-    const newDetails = {
-      winner_name: '',
-      winner_phone: '',
-      winner_point: 0,
+    const config = useRuntimeConfig();
+    const data = await matchService.getResult(postId, config.public.getresultServiceUrl);
+    resultDetails.value = {
+      winner_name: data.winner?.name || '',
+      winner_phone: data.winner?.mobile_number || '',
+      winner_point: data.winner?.points !== undefined ? data.winner.points : (data.winner?.point || 0),
       participants: '',
-      participants_list: [],
-      othercomments: '',
-      othercomments_list: []
-    };
-
-    if (resResult.status === 'fulfilled') {
-      const data = resResult.value;
-      newDetails.winner_name = data.winner?.name || '';
-      newDetails.winner_phone = data.winner?.mobile_number || '';
-      newDetails.winner_point = data.winner?.points !== undefined ? data.winner.points : (data.winner?.point || 0);
-      newDetails.participants_list = (data.participants || []).map(p => ({
+      participants_list: (data.participants || []).map(p => ({
         ...p,
         point: p.points !== undefined ? p.points : (p.point || 0)
-      }));
-    } else {
-      console.error('Failed to fetch result details', resResult.reason);
-    }
-
-    // Commented out backend comments fetching for now as requested
-    /*
-    const [resComments] = await Promise.allSettled([
-      matchService.getComments(postId, config.public.getcommentsServiceUrl)
-    ]);
-    if (resComments.status === 'fulfilled') {
-      const data = resComments.value;
-      newDetails.othercomments = data.comments || '';
-      newDetails.othercomments_list = Array.isArray(data.comments) ? data.comments.map(c => ({
-        name: typeof c === 'string' ? c : (c.name || ''),
-        mobile_number: typeof c === 'string' ? '' : (c.mobile_number || c.phone || c.mobile || '')
-      })) : [];
-    } else {
-      console.error('Failed to fetch other comments', resComments.reason);
-    }
-    */
-
-    // For now, load sample data from samplecomments.json
-    let commentsData = [];
-    const sourceData = sampleCommentsData && sampleCommentsData.default ? sampleCommentsData.default : sampleCommentsData;
-    console.log('sourceData loaded from JSON:', sourceData);
-    
-    if (sourceData) {
-      if (sourceData['other-participants']) {
-        commentsData = sourceData['other-participants'];
-      } else if (sourceData['other_participants']) {
-        commentsData = sourceData['other_participants'];
-      } else if (Array.isArray(sourceData)) {
-        commentsData = sourceData;
-      } else {
-        // Find any array property inside the JSON object
-        const arrayKey = Object.keys(sourceData).find(key => Array.isArray(sourceData[key]));
-        if (arrayKey) {
-          commentsData = sourceData[arrayKey];
-        }
-      }
-    }
-    console.log('Resolved commentsData array:', commentsData);
-
-    newDetails.othercomments_list = commentsData.map(c => ({
-      name: c.name || '',
-      mobile_number: c.mobile_number || '',
-      comment: c.comment || c.comments || ''
-    }));
-
-    resultDetails.value = newDetails;
+      }))
+    };
   } catch (e) {
-    console.error('Failed to fetch result and comments', e);
+    console.error('Failed to fetch result details', e);
+    resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '', participants_list: [] };
   } finally {
     loadingResult.value = false;
   }
@@ -252,11 +181,11 @@ const fetchResultAndComments = async (postId) => {
 watch(
   () => selectedMatch.value,
   (newVal) => {
-    activeTab.value = 'participants';
+    participantFilter.value = 'full';
     if (newVal) {
-      fetchResultAndComments(newVal.post_id);
+      fetchResultDetails(newVal.post_id);
     } else {
-      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '', participants_list: [], othercomments: '', othercomments_list: [] };
+      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '' };
     }
   }
 );
@@ -265,12 +194,12 @@ watch(
 watch(
   () => props.show,
   (newVal) => {
-    activeTab.value = 'participants';
+    participantFilter.value = 'full';
     if (newVal && matchesWithPostId.value.length) {
       selectedMatch.value = matchesWithPostId.value[0];
     } else if (!newVal) {
       selectedMatch.value = null;
-      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '', participants_list: [], othercomments: '', othercomments_list: [] };
+      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '' };
     }
   },
   { immediate: true }
@@ -289,25 +218,30 @@ const participantsList = computed(() => {
     .map(name => ({ name, phone: '' }));
 });
 
-// Computed property to get other comments formatted list
-const otherCommentsList = computed(() => {
-  if (resultDetails.value.othercomments_list && resultDetails.value.othercomments_list.length > 0) {
-    return resultDetails.value.othercomments_list;
+// Computed property to check if the match has been calculated
+const isCalculated = computed(() => {
+  if (!selectedMatch.value) return false;
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('calculatedMatches');
+      if (stored) {
+        const list = JSON.parse(stored);
+        return Array.isArray(list) && list.includes(selectedMatch.value.match_no);
+      }
+    } catch (e) {
+      console.error('Failed to read calculatedMatches from localStorage:', e);
+    }
   }
-  if (Array.isArray(resultDetails.value.othercomments) && resultDetails.value.othercomments.length > 0) {
-    return resultDetails.value.othercomments.map(c => ({
-      name: typeof c === 'string' ? c : (c.name || ''),
-      mobile_number: typeof c === 'string' ? '' : (c.mobile_number || c.phone || c.mobile || '')
-    }));
+  return false;
+});
+
+// Filter participants by match type (Full Match vs Partial Match)
+const filteredParticipants = computed(() => {
+  if (participantFilter.value === 'full') {
+    return participantsList.value.filter(p => p.point === undefined || p.point >= 10);
+  } else {
+    return participantsList.value.filter(p => p.point !== undefined && p.point < 10);
   }
-  if (typeof resultDetails.value.othercomments === 'string' && resultDetails.value.othercomments.trim() !== '') {
-    return resultDetails.value.othercomments
-      .split(',')
-      .map(p => p.trim())
-      .filter(p => p.length > 0)
-      .map(name => ({ name, mobile_number: '' }));
-  }
-  return [];
 });
 </script>
 
@@ -330,9 +264,9 @@ const otherCommentsList = computed(() => {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   width: 95%;
-  max-width: 1100px;
-  height: 80vh;
-  padding: 28px;
+  max-width: 1050px;
+  height: 85vh;
+  padding: 24px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   color: #1e293b;
   max-height: 90vh;
@@ -372,7 +306,7 @@ const otherCommentsList = computed(() => {
 }
 
 .modal-body {
-  margin-bottom: 20px;
+  margin-bottom: 0;
   overflow-y: auto;
   flex-grow: 1;
 }
@@ -380,9 +314,9 @@ const otherCommentsList = computed(() => {
 /* Results grid layout */
 .results-layout {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 200px 1fr;
   gap: 20px;
-  min-height: 350px;
+  height: 100%;
 }
 
 .post-id-sidebar {
@@ -407,7 +341,26 @@ const otherCommentsList = computed(() => {
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
-  max-height: 480px;
+  max-height: 60vh;
+  padding-right: 4px;
+}
+
+.post-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.post-list::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.post-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.post-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .post-item-btn {
@@ -563,7 +516,7 @@ const otherCommentsList = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 380px;
+  max-height: 420px;
   overflow-y: auto;
   padding: 2px;
 }
@@ -648,7 +601,6 @@ const otherCommentsList = computed(() => {
 .modal-fade-leave-to {
   opacity: 0;
 }
-
 
 .results-tabs {
   display: flex;

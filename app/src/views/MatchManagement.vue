@@ -9,12 +9,7 @@
     <!-- Toast Notifications -->
     <div class="toast-container">
       <TransitionGroup name="toast">
-        <div
-          v-for="toast in toasts"
-          :key="toast.id"
-          class="toast"
-          :class="'toast-' + toast.type"
-        >
+        <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast-' + toast.type">
           <span class="toast-icon">{{ toast.type === 'success' ? '✓' : '⚠️' }}</span>
           <span class="toast-message">{{ toast.message }}</span>
           <button class="toast-close" @click="removeToast(toast.id)">&times;</button>
@@ -41,6 +36,9 @@
         <button class="btn-logout" @click="handleLogout" title="Sign Out">
           Sign Out
         </button>
+        <button class="btn-present" @click="handlePresent" title="Mark as Present">
+          Present
+        </button>
       </div>
     </header>
 
@@ -49,13 +47,8 @@
       <!-- Status Tabs / Filter Pills -->
       <div class="filter-tabs-container">
         <div class="tabs-list">
-          <button
-            v-for="tab in filterTabs"
-            :key="tab.value"
-            class="tab-pill"
-            :class="{ active: activeStatusFilter === tab.value }"
-            @click="activeStatusFilter = tab.value"
-          >
+          <button v-for="tab in filterTabs" :key="tab.value" class="tab-pill"
+            :class="{ active: activeStatusFilter === tab.value }" @click="activeStatusFilter = tab.value">
             {{ tab.label }}
             <span class="tab-count">{{ tab.count }}</span>
           </button>
@@ -64,42 +57,23 @@
 
       <!-- Match Visual Dashboard Grid -->
       <section class="content-main">
-        <MatchTable
-          :matches="matches"
-          :active-status-filter="activeStatusFilter"
-          :calculated-match-nos="calculatedMatchNos"
-          @request-delete="triggerDeleteConfirmation"
-          @update-status="handleUpdateStatus"
-          @update-match="handleUpdateMatch"
-          @calculate-match="handleCalculateMatch"
-          @show-toast="e => addToast(e.message, e.type)"
-        />
+        <MatchTable :matches="matches" :active-status-filter="activeStatusFilter"
+          :calculated-match-nos="calculatedMatchNos" @request-delete="triggerDeleteConfirmation"
+          @update-status="handleUpdateStatus" @update-match="handleUpdateMatch" @calculate-match="handleCalculateMatch"
+          @show-toast="e => addToast(e.message, e.type)" />
       </section>
     </main>
 
     <!-- Add Match Modal -->
-    <AddMatchModal
-      :show="showAddModal"
-      :loading="modalActionLoading"
-      @confirm="handleConfirmAdd"
-      @bulk-confirm="handleConfirmBulkAdd"
-      @cancel="showAddModal = false"
-    />
+    <AddMatchModal :show="showAddModal" :loading="modalActionLoading" @confirm="handleConfirmAdd"
+      @bulk-confirm="handleConfirmBulkAdd" @cancel="showAddModal = false" />
 
     <!-- Confirmation Modal for Deletion -->
-    <ConfirmDeleteModal
-      :show="showDeleteModal"
-      :match-no="matchToDelete"
-      @confirm="handleConfirmDelete"
-      @cancel="closeDeleteModal"
-    />
+    <ConfirmDeleteModal :show="showDeleteModal" :match-no="matchToDelete" @confirm="handleConfirmDelete"
+      @cancel="closeDeleteModal" />
 
     <!-- View Results Modal -->
-    <ViewResultsModal
-      :show="showResultsModal"
-      :matches="matches"
-      @close="showResultsModal = false"
-    />
+    <ViewResultsModal :show="showResultsModal" :matches="matches" @close="showResultsModal = false" />
   </div>
 </template>
 
@@ -179,6 +153,10 @@ const handleLogout = () => {
   const authCookie = useCookie('isAuthenticated');
   authCookie.value = null;
   navigateTo('/login');
+};
+
+const handlePresent = () => {
+  window.open('https://worldcup.ambition.guru/', '_blank');
 };
 
 // API operations
@@ -283,14 +261,14 @@ const handleConfirmBulkAdd = async (matchesList) => {
 
   showAddModal.value = false;
   modalActionLoading.value = false;
-  
+
   if (insertedCount > 0) {
     addToast(`Successfully bulk inserted ${insertedCount} matches!`, 'success');
   }
   if (failedCount > 0) {
     addToast(`Failed to insert ${failedCount} matches. Error: ${lastError}`, 'error');
   }
-  
+
   await fetchMatches();
 };
 
@@ -344,7 +322,7 @@ const handleCalculateMatch = async (match) => {
       if (!isNaN(parsed)) {
         pid = parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const getKathmanduTime = (dateInput) => {
       let date;
@@ -494,7 +472,8 @@ body {
 }
 
 .btn-primary {
-  background: #1976d2; /* Quasar Blue primary color */
+  background: #1976d2;
+  /* Quasar Blue primary color */
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -556,6 +535,7 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 .btn-logout {
   background: #ef4444;
   color: #ffffff;
@@ -571,6 +551,23 @@ body {
 .btn-logout:hover {
   background: #dc2626;
 }
+
+.btn-present {
+  background: #4e3b6e;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-present:hover {
+  background: #3d28f5;
+}
+
 /* Main Dashboard content */
 .dashboard-content {
   display: flex;
@@ -745,6 +742,8 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>
