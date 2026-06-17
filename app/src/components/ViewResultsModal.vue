@@ -35,20 +35,12 @@
                 <div class="winner-box">
                   <div class="winner-info-left">
                     <span class="winner-label">Winner</span>
-                    <h3 class="winner-name">
-                      <template v-if="!isCalculated">
-                        Please calculate at first!
-                      </template>
-                      <template v-else>
-                        {{ resultDetails.winner_name || 'No correct guess!' }}
-                      </template>
-                    </h3>
-                    <p class="winner-phone"
-                      v-if="isCalculated && resultDetails.winner_name && resultDetails.winner_phone">
+                    <h3 class="winner-name">{{ resultDetails.winner_name || 'No correct guess!' }}</h3>
+                    <p class="winner-phone" v-if="resultDetails.winner_name && resultDetails.winner_phone">
                       📞 {{ resultDetails.winner_phone }}
                     </p>
                   </div>
-                  <div class="winner-info-right" v-if="isCalculated && resultDetails.winner_name">
+                  <div class="winner-info-right" v-if="resultDetails.winner_name">
                     <span class="pts-badge winner-pts">{{ resultDetails.winner_point }} Points</span>
                   </div>
                 </div>
@@ -65,12 +57,12 @@
                     <div class="results-tabs">
                       <button class="tab-btn" :class="{ active: participantFilter === 'full' }"
                         @click="participantFilter = 'full'">
-                        Full Match ({{participantsList.filter(p => p.point === undefined || p.point >= 10).length}})
+                        Full Match ({{ (resultDetails.correct_participants || []).length }})
                       </button>
                       <button class="tab-btn" :class="{ active: participantFilter === 'partial' }"
                         @click="participantFilter = 'partial'">
-                        Partial Match ({{participantsList.filter(p => p.point !== undefined && p.point < 10).length}})
-                          </button>
+                        Partial Match ({{ (resultDetails.partial_participants || []).length }})
+                      </button>
                     </div>
 
                     <!-- Participants List -->
@@ -130,8 +122,8 @@ const resultDetails = ref({
   winner_name: '',
   winner_phone: '',
   winner_point: 0,
-  participants: '',
-  participants_list: []
+  correct_participants: [],
+  partial_participants: []
 });
 const loadingResult = ref(false);
 
@@ -140,20 +132,7 @@ const matchesWithPostId = computed(() => {
   return props.matches.filter(m => m.post_id && m.post_id.trim() !== '');
 });
 
-// TODO: Replace the static JSON import with an environment variable pointing to the result endpoint.
-// const fetchData = ... (remove this line when using the real API)
-// Removed static fetchData import; fetching results from API
-
 // Fetches result details from the backend endpoint defined in an environment variable.
-// Replace the dummy implementation below with a call to the API, e.g.:
-// const fetchResultDetails = async (postId) => {
-//   const endpoint = import.meta.env.VITE_RESULT_ENDPOINT; // adjust as needed
-//   const res = await fetch(`${endpoint}/${postId}`);
-//   const data = await res.json();
-//   resultDetails.value = {
-//     winner_name: data.winner?.name || '',
-//     winner_phone: data.winner?.mobile_number || '',
-//     winner_point: data.winner?.point || 0,
 const fetchResultDetails = async (postId) => {
   loadingResult.value = true;
   try {
@@ -163,15 +142,18 @@ const fetchResultDetails = async (postId) => {
       winner_name: data.winner?.name || '',
       winner_phone: data.winner?.mobile_number || '',
       winner_point: data.winner?.points !== undefined ? data.winner.points : (data.winner?.point || 0),
-      participants: '',
-      participants_list: (data.participants || []).map(p => ({
+      correct_participants: (data.correct_participants || []).map(p => ({
+        ...p,
+        point: p.points !== undefined ? p.points : (p.point || 0)
+      })),
+      partial_participants: (data.partial_participants || []).map(p => ({
         ...p,
         point: p.points !== undefined ? p.points : (p.point || 0)
       }))
     };
   } catch (e) {
     console.error('Failed to fetch result details', e);
-    resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '', participants_list: [] };
+    resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, correct_participants: [], partial_participants: [] };
   } finally {
     loadingResult.value = false;
   }
@@ -185,7 +167,7 @@ watch(
     if (newVal) {
       fetchResultDetails(newVal.post_id);
     } else {
-      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '' };
+      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, correct_participants: [], partial_participants: [] };
     }
   }
 );
@@ -199,24 +181,11 @@ watch(
       selectedMatch.value = matchesWithPostId.value[0];
     } else if (!newVal) {
       selectedMatch.value = null;
-      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '' };
+      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, correct_participants: [], partial_participants: [] };
     }
   },
   { immediate: true }
 );
-
-// Split comma-separated participants string into an array of objects
-const participantsList = computed(() => {
-  if (resultDetails.value.participants_list && resultDetails.value.participants_list.length > 0) {
-    return resultDetails.value.participants_list;
-  }
-  if (!resultDetails.value.participants) return [];
-  return resultDetails.value.participants
-    .split(',')
-    .map(p => p.trim())
-    .filter(p => p.length > 0)
-    .map(name => ({ name, phone: '' }));
-});
 
 // Computed property to check if the match has been calculated
 const isCalculated = computed(() => {
@@ -238,9 +207,9 @@ const isCalculated = computed(() => {
 // Filter participants by match type (Full Match vs Partial Match)
 const filteredParticipants = computed(() => {
   if (participantFilter.value === 'full') {
-    return participantsList.value.filter(p => p.point === undefined || p.point >= 10);
+    return resultDetails.value.correct_participants || [];
   } else {
-    return participantsList.value.filter(p => p.point !== undefined && p.point < 10);
+    return resultDetails.value.partial_participants || [];
   }
 });
 </script>

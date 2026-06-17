@@ -367,8 +367,7 @@ const getTeam2Goal = (goalDiff) => {
 };
 
 const isCalculateDisabled = (match) => {
-  if (props.calculatedMatchNos.includes(match.match_no)) return true;
-  if (!match.end_time) return true;
+  if (!match.end_time) return false;
 
   let endStr = String(match.end_time).trim();
   if (endStr.includes(' ')) {
@@ -380,7 +379,7 @@ const isCalculateDisabled = (match) => {
   }
 
   const endTime = new Date(endStr);
-  if (isNaN(endTime.getTime())) return true;
+  if (isNaN(endTime.getTime())) return false;
 
   return endTime > new Date();
 };

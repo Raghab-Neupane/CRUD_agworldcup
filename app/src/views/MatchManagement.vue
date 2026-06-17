@@ -313,6 +313,28 @@ const handleUpdateMatch = async ({ matchNo, updatedData }) => {
 const handleCalculateMatch = async (match) => {
   loading.value = true;
   try {
+    // Validate all fields are filled
+    const requiredFields = [
+      { key: 'stage', name: 'Stage' },
+      { key: 'team1', name: 'Team 1' },
+      { key: 'team2', name: 'Team 2' },
+      { key: 'post_id', name: 'Post ID' },
+      { key: 'team_1_goal', name: 'Team 1 Goal' },
+      { key: 'team_2_goal', name: 'Team 2 Goal' },
+      { key: 'start_time', name: 'Start Time' },
+      { key: 'end_time', name: 'End Time' }
+    ];
+
+    const emptyFields = requiredFields.filter(f => {
+      const val = match[f.key];
+      return val === null || val === undefined || String(val).trim() === '';
+    });
+
+    if (emptyFields.length > 0) {
+      const fieldNames = emptyFields.map(f => f.name).join(', ');
+      throw new Error(`All fields must be filled. Missing: ${fieldNames}`);
+    }
+
     const g1 = match.team_1_goal !== null && match.team_1_goal !== undefined && match.team_1_goal !== '' ? parseInt(match.team_1_goal, 10) : 0;
     const g2 = match.team_2_goal !== null && match.team_2_goal !== undefined && match.team_2_goal !== '' ? parseInt(match.team_2_goal, 10) : 0;
 
