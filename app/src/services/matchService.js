@@ -108,23 +108,6 @@ export default {
       params: { post_id: postId }
     });
     return response.data;
-  },
-
-  /**
-   * Fetch comments details by post ID.
-   * GET /comments
-   */
-  async getComments(postId, baseUrl) {
-    if (baseUrl) {
-      const response = await axios.get(baseUrl, {
-        params: { post_id: postId }
-      });
-      return response.data;
-    }
-    const response = await apiClient.get('/comments', {
-      params: { post_id: postId }
-    });
-    return response.data;
   }
 };
 
