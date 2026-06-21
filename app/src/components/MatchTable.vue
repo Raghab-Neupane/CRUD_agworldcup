@@ -129,7 +129,7 @@
               </div>
               <div v-else class="actions-group">
                 <button class="q-btn-calculate" :disabled="isCalculateDisabled(match)"
-                  @click="$emit('calculate-match', match)">Calculate</button>
+                  @click="$emit('analyze-match', match)">Analyze now</button>
                 <button class="q-btn-edit-row" @click="startEditing(match)">Edit</button>
                 <button class="q-btn-delete" @click="$emit('request-delete', match.match_no)">Delete</button>
               </div>

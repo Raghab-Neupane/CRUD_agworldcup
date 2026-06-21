@@ -108,6 +108,63 @@ export default {
       params: { post_id: postId }
     });
     return response.data;
+  },
+
+  /**
+   * Fetch comments details by post ID.
+   * GET /comments
+   */
+  async getComments(postId, baseUrl) {
+    if (baseUrl) {
+      const response = await axios.get(baseUrl, {
+        params: { post_id: postId }
+      });
+      return response.data;
+    }
+    const response = await apiClient.get('/comments', {
+      params: { post_id: postId }
+    });
+    return response.data;
+  },
+
+  /**
+   * Post to analyze endpoint.
+   * POST /analyze
+   */
+  async analyze(payload, baseUrl) {
+    if (baseUrl) {
+      const response = await axios.post(baseUrl, payload);
+      return response.data;
+    }
+    const response = await apiClient.post('/analyze', payload);
+    return response.data;
+  },
+
+  /**
+   * Clear calculation entry by post ID.
+   * POST /clear-calculation/{post_id}
+   */
+  async clearCalculation(postId, baseUrl) {
+    if (baseUrl) {
+      const response = await axios.post(`${baseUrl}/${postId}`);
+      return response.data;
+    }
+    const response = await apiClient.post(`/clear-calculation/${postId}`);
+    return response.data;
+  },
+
+  /**
+   * Update match status for a comment (full_match/partial_match).
+   * POST /comments/update
+   */
+  async updateCommentStatus(postId, commentData) {
+    const response = await apiClient.post(`/comments/update`, {
+      post_id: postId,
+      customer_id: commentData.customer_id || commentData.user_id || commentData.id,
+      full_match: commentData.full_match,
+      partial_match: commentData.partial_match
+    });
+    return response.data;
   }
 };
 

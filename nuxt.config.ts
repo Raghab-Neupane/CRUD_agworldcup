@@ -12,6 +12,9 @@ export default defineNuxtConfig({
       assetsUrl: process.env.NUXT_PUBLIC_ASSETS_URL || '',
       calcServiceUrl: process.env.NUXT_PUBLIC_CALC_SERVICE_URL || '',
       getresultServiceUrl: process.env.NUXT_PUBLIC_GETRESULT_SERVICE_URL || '',
+      commentsServiceUrl: process.env.NUXT_PUBLIC_COMMENTS_SERVICE_URL || '',
+      clearCalcServiceUrl: process.env.NUXT_PUBLIC_CLEAR_CALC_SERVICE_URL || '',
+      analyzeServiceUrl: process.env.NUXT_PUBLIC_ANALYZE_SERVICE_URL || '',
     }
   }
 })
