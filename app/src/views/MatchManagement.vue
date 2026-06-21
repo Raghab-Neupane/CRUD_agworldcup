@@ -60,6 +60,7 @@
         <MatchTable :matches="matches" :active-status-filter="activeStatusFilter"
           :calculated-match-nos="calculatedMatchNos" @request-delete="triggerDeleteConfirmation"
           @update-status="handleUpdateStatus" @update-match="handleUpdateMatch" @calculate-match="handleCalculateMatch"
+          @analyze-match="handleAnalyzeMatch"
           @show-toast="e => addToast(e.message, e.type)" @refresh-matches="fetchMatches" />
       </section>
     </main>
@@ -74,6 +75,10 @@
 
     <!-- View Results Modal -->
     <ViewResultsModal :show="showResultsModal" :matches="matches" @close="showResultsModal = false" />
+
+    <!-- Analyze Comments Modal -->
+    <AnalyzeCommentsModal :show="showAnalyzeModal" :matches="matches" :initial-match="matchToAnalyze" :initial-comments="commentsToAnalyze"
+      @close="showAnalyzeModal = false" @show-toast="e => addToast(e.message, e.type)" @refresh-matches="fetchMatches" />
   </div>
 </template>
 
@@ -84,6 +89,7 @@ import AddMatchModal from '../components/AddMatchModal.vue';
 import MatchTable from '../components/MatchTable.vue';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
 import ViewResultsModal from '../components/ViewResultsModal.vue';
+import AnalyzeCommentsModal from '../components/AnalyzeCommentsModal.vue';
 
 // State variables
 const matches = ref([]);
@@ -92,6 +98,9 @@ const modalActionLoading = ref(false);
 const toasts = ref([]);
 const activeStatusFilter = ref('all');
 const calculatedMatchNos = ref([]);
+const showAnalyzeModal = ref(false);
+const matchToAnalyze = ref(null);
+const commentsToAnalyze = ref([]);
 
 const loadCalculatedMatches = () => {
   if (typeof window !== 'undefined') {
@@ -405,6 +414,107 @@ const handleCalculateMatch = async (match) => {
 };
 
 // Delete actions
+const handleAnalyzeMatch = async (match) => {
+  loading.value = true;
+  try {
+    // Validate all fields are filled
+    const requiredFields = [
+      { key: 'stage', name: 'Stage' },
+      { key: 'team1', name: 'Team 1' },
+      { key: 'team2', name: 'Team 2' },
+      { key: 'post_id', name: 'Post ID' },
+      { key: 'team_1_goal', name: 'Team 1 Goal' },
+      { key: 'team_2_goal', name: 'Team 2 Goal' },
+      { key: 'start_time', name: 'Start Time' },
+      { key: 'end_time', name: 'End Time' }
+    ];
+
+    const emptyFields = requiredFields.filter(f => {
+      const val = match[f.key];
+      return val === null || val === undefined || String(val).trim() === '';
+    });
+
+    if (emptyFields.length > 0) {
+      const fieldNames = emptyFields.map(f => f.name).join(', ');
+      throw new Error(`All fields must be filled. Missing: ${fieldNames}`);
+    }
+
+    const g1 = match.team_1_goal !== null && match.team_1_goal !== undefined && match.team_1_goal !== '' ? parseInt(match.team_1_goal, 10) : 0;
+    const g2 = match.team_2_goal !== null && match.team_2_goal !== undefined && match.team_2_goal !== '' ? parseInt(match.team_2_goal, 10) : 0;
+
+    let pid = match.post_id || match.match_no;
+    try {
+      const parsed = parseInt(pid, 10);
+      if (!isNaN(parsed)) {
+        pid = parsed;
+      }
+    } catch (e) { }
+
+    const getKathmanduTime = (dateInput) => {
+      let date;
+      if (!dateInput) {
+        date = new Date();
+      } else {
+        let str = String(dateInput).trim();
+        if (str.includes(' ')) {
+          str = str.replace(' ', 'T');
+        }
+        date = new Date(str);
+      }
+
+      if (isNaN(date.getTime())) {
+        date = new Date();
+      }
+
+      const kathmanduOffsetMs = (5 * 60 + 45) * 60 * 1000;
+      const ktmDate = new Date(date.getTime() + kathmanduOffsetMs);
+
+      const pad = (num) => String(num).padStart(2, '0');
+      const yyyy = ktmDate.getUTCFullYear();
+      const mm = pad(ktmDate.getUTCMonth() + 1);
+      const dd = pad(ktmDate.getUTCDate());
+      const hh = pad(ktmDate.getUTCHours());
+      const min = pad(ktmDate.getUTCMinutes());
+      const ss = pad(ktmDate.getUTCSeconds());
+
+      return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}+05:45`;
+    };
+
+    const startTimeFormatted = getKathmanduTime(match.start_time);
+    const endTimeFormatted = getKathmanduTime(match.end_time);
+
+    const payload = {
+      post_id: pid,
+      team_1_name: match.team1,
+      team_1_goal: g1,
+      team_2_name: match.team2,
+      team_2_goal: g2,
+      start_time: startTimeFormatted,
+      end_time: endTimeFormatted
+    };
+
+    try {
+      const config = useRuntimeConfig();
+      const response = await matchService.analyze(payload, config.public.analyzeServiceUrl);
+      commentsToAnalyze.value = Array.isArray(response) ? response : (response?.comments || []);
+      addToast('Analyzed match details successfully.', 'success');
+    } catch (apiError) {
+      console.warn('Backend analyze endpoint failed, opening comments modal anyway:', apiError);
+      const errorMsg = apiError.response?.data?.detail || apiError.message || 'Failed to send analyze payload to backend';
+      addToast(errorMsg + ' (Opened modal anyway)', 'error');
+      commentsToAnalyze.value = [];
+    }
+
+    matchToAnalyze.value = match;
+    showAnalyzeModal.value = true;
+  } catch (error) {
+    const errorMsg = error.message || 'Failed to initiate analyze';
+    addToast(errorMsg, 'error');
+  } finally {
+    loading.value = false;
+  }
+};
+
 const triggerDeleteConfirmation = (matchNo) => {
   matchToDelete.value = matchNo;
   showDeleteModal.value = true;
