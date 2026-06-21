@@ -77,7 +77,7 @@
     <ViewResultsModal :show="showResultsModal" :matches="matches" @close="showResultsModal = false" />
 
     <!-- Analyze Comments Modal -->
-    <AnalyzeCommentsModal :show="showAnalyzeModal" :matches="matches" :initial-match="matchToAnalyze" :initial-comments="commentsToAnalyze"
+    <AnalyzeCommentsModal :show="showAnalyzeModal" :matches="matches" :initial-match="matchToAnalyze" :initial-comments="commentsToAnalyze" :initial-analyze-data="analyzeResponseData"
       @close="showAnalyzeModal = false" @show-toast="e => addToast(e.message, e.type)" @refresh-matches="fetchMatches" />
   </div>
 </template>
@@ -101,6 +101,7 @@ const calculatedMatchNos = ref([]);
 const showAnalyzeModal = ref(false);
 const matchToAnalyze = ref(null);
 const commentsToAnalyze = ref([]);
+const analyzeResponseData = ref(null);
 
 const loadCalculatedMatches = () => {
   if (typeof window !== 'undefined') {
@@ -496,6 +497,7 @@ const handleAnalyzeMatch = async (match) => {
     try {
       const config = useRuntimeConfig();
       const response = await matchService.analyze(payload, config.public.analyzeServiceUrl);
+      analyzeResponseData.value = response;
       commentsToAnalyze.value = Array.isArray(response) ? response : (response?.comments || []);
       addToast('Analyzed match details successfully.', 'success');
     } catch (apiError) {
@@ -503,6 +505,7 @@ const handleAnalyzeMatch = async (match) => {
       const errorMsg = apiError.response?.data?.detail || apiError.message || 'Failed to send analyze payload to backend';
       addToast(errorMsg + ' (Opened modal anyway)', 'error');
       commentsToAnalyze.value = [];
+      analyzeResponseData.value = null;
     }
 
     matchToAnalyze.value = match;

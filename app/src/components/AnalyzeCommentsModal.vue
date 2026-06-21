@@ -79,6 +79,7 @@
                           <td style="text-align: center;">
                             <label class="q-checkbox">
                               <input type="checkbox" v-model="c.full_match"
+                                :disabled="c.is_disabled"
                                 @change="c.full_match && (c.partial_match = false)" />
                               <span class="q-checkbox-box"></span>
                             </label>
@@ -86,6 +87,7 @@
                           <td style="text-align: center;">
                             <label class="q-checkbox">
                               <input type="checkbox" v-model="c.partial_match"
+                                :disabled="c.is_disabled"
                                 @change="c.partial_match && (c.full_match = false)" />
                               <span class="q-checkbox-box"></span>
                             </label>
@@ -151,6 +153,10 @@ const props = defineProps({
   initialComments: {
     type: Array,
     default: () => []
+  },
+  initialAnalyzeData: {
+    type: Object,
+    default: null
   }
 });
 
@@ -204,11 +210,28 @@ const fetchResultDetails = async (postId) => {
 
 const setCommentsFromProps = () => {
   if (props.initialComments && props.initialComments.length > 0) {
-    comments.value = props.initialComments.map(c => ({
-      ...c,
-      partial_match: !!c.partial_match,
-      full_match: !!c.full_match
-    }));
+    const specialWinnerIds = new Set(
+      (props.initialAnalyzeData?.special_winners || []).map(w => String(w.customer_id || w.commenter_id || w.user_id || w.id))
+    );
+    const partialWinnerIds = new Set(
+      (props.initialAnalyzeData?.partial_winners || []).map(w => String(w.customer_id || w.commenter_id || w.user_id || w.id))
+    );
+
+    comments.value = props.initialComments.map(c => {
+      const custId = String(c.customer_id || c.commenter_id || c.user_id || c.id);
+      const isFull = specialWinnerIds.has(custId);
+      const isPartial = partialWinnerIds.has(custId);
+
+      return {
+        ...c,
+        customer_id: custId,
+        name: c.name || c.customer_name || c.username || 'Anonymous',
+        comment: c.comment || c.comment_text || c.text || '',
+        full_match: isFull || !!c.full_match,
+        partial_match: isPartial || !!c.partial_match,
+        is_disabled: isFull || isPartial
+      };
+    });
   } else {
     comments.value = [];
   }
@@ -243,15 +266,17 @@ const handleCalculate = async () => {
         const custId = c.customer_id || c.user_id || c.id;
         const commentText = c.comment || c.comment_text || c.text || '';
         
-        if (c.full_match) {
+        if (c.full_match && !c.is_disabled) {
           fullMatchList.push({
             comment: commentText,
-            customer_id: custId
+            customer_id: custId,
+            points: 100
           });
-        } else if (c.partial_match) {
+        } else if (c.partial_match && !c.is_disabled) {
           partialMatchList.push({
             comment: commentText,
-            customer_id: custId
+            customer_id: custId,
+            points: 1
           });
         }
       });
@@ -333,12 +358,44 @@ const handleCalculate = async () => {
   }
 };
 
+const setResultsFromAnalyzeData = () => {
+  if (props.initialAnalyzeData) {
+    const pWinners = props.initialAnalyzeData.partial_winners || [];
+    const sWinners = props.initialAnalyzeData.special_winners || [];
+    
+    // Pick top winner
+    const topWinner = sWinners[0] || pWinners[0] || null;
+    
+    resultDetails.value = {
+      winner_name: topWinner?.name || '',
+      winner_phone: topWinner?.mobile_number || '',
+      winner_point: topWinner?.points !== undefined ? topWinner.points : (topWinner?.point || 0),
+      correct_participants: sWinners.map(p => ({
+        name: p.name || p.customer_name || 'Anonymous',
+        mobile_number: p.mobile_number || '',
+        point: p.points !== undefined ? p.points : (p.point || 0)
+      })),
+      partial_participants: pWinners.map(p => ({
+        name: p.name || p.customer_name || 'Anonymous',
+        mobile_number: p.mobile_number || '',
+        point: p.points !== undefined ? p.points : (p.point || 0)
+      }))
+    };
+  } else {
+    resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, correct_participants: [], partial_participants: [] };
+  }
+};
+
 watch(
   () => selectedMatch.value,
   (newVal) => {
     participantFilter.value = 'comments';
     if (newVal) {
-      fetchResultDetails(newVal.post_id);
+      if (props.initialAnalyzeData) {
+        setResultsFromAnalyzeData();
+      } else {
+        fetchResultDetails(newVal.post_id);
+      }
       setCommentsFromProps();
     } else {
       resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, correct_participants: [], partial_participants: [] };
@@ -352,6 +409,16 @@ watch(
   () => {
     if (selectedMatch.value) {
       setCommentsFromProps();
+    }
+  },
+  { deep: true }
+);
+
+watch(
+  () => props.initialAnalyzeData,
+  () => {
+    if (selectedMatch.value) {
+      setResultsFromAnalyzeData();
     }
   },
   { deep: true }
@@ -863,6 +930,21 @@ const filteredParticipants = computed(() => {
 .q-checkbox input:checked+.q-checkbox-box {
   background: #1976d2;
   border-color: #1976d2;
+}
+
+.q-checkbox:has(input:disabled) {
+  cursor: not-allowed;
+}
+
+.q-checkbox input:disabled+.q-checkbox-box {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.q-checkbox input:disabled:checked+.q-checkbox-box {
+  background: #94a3b8;
+  border-color: #94a3b8;
 }
 
 .q-checkbox-box::after {
