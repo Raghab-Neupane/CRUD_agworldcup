@@ -79,14 +79,14 @@
                           <td style="text-align: center;">
                             <label class="q-checkbox">
                               <input type="checkbox" v-model="c.full_match"
-                                @change="c.full_match && (c.partial_match = false); handleCommentCheckboxChange(c)" />
+                                @change="c.full_match && (c.partial_match = false)" />
                               <span class="q-checkbox-box"></span>
                             </label>
                           </td>
                           <td style="text-align: center;">
                             <label class="q-checkbox">
                               <input type="checkbox" v-model="c.partial_match"
-                                @change="c.partial_match && (c.full_match = false); handleCommentCheckboxChange(c)" />
+                                @change="c.partial_match && (c.full_match = false)" />
                               <span class="q-checkbox-box"></span>
                             </label>
                           </td>
@@ -210,35 +210,9 @@ const setCommentsFromProps = () => {
       full_match: !!c.full_match
     }));
   } else {
-    // Load 10 sample comments
-    const teams = ['Germany', 'Curacao'];
-    comments.value = Array.from({ length: 10 }, (_, i) => {
-      const winner = teams[i % 2];
-      const g1 = Math.floor(Math.random() * 4);
-      const g2 = Math.floor(Math.random() * 3);
-      const commentGuess = `${winner} wins ${winner === 'Germany' ? `${g1 + 1}-${g2}` : `${g2}-${g1 + 1}`}`;
-      return {
-        customer_id: 'CUST-' + Math.floor(10000 + Math.random() * 90000),
-        name: `User ${i + 1}`,
-        comment: `My prediction: ${commentGuess}! Good luck to both teams.`,
-        full_match: false,
-        partial_match: false
-      };
-    });
+    comments.value = [];
   }
 };
-
-const handleCommentCheckboxChange = async (comment) => {
-  try {
-    if (!selectedMatch.value) return;
-    await matchService.updateCommentStatus(selectedMatch.value.post_id, comment);
-    emit('show-toast', { message: 'Comment selection saved in DB.', type: 'success' });
-  } catch (err) {
-    console.error('Failed to update comment status in DB:', err);
-    emit('show-toast', { message: 'Failed to update selection in DB (Saved locally).', type: 'warning' });
-  }
-};
-
 
 
 // Handle Calculate action (old calculate logic hitting calcServiceUrl)
@@ -283,8 +257,47 @@ const handleCalculate = async () => {
       });
     }
 
+    const getKathmanduTime = (dateInput) => {
+      let date;
+      if (!dateInput) {
+        date = new Date();
+      } else {
+        let str = String(dateInput).trim();
+        if (str.includes(' ')) {
+          str = str.replace(' ', 'T');
+        }
+        date = new Date(str);
+      }
+
+      if (isNaN(date.getTime())) {
+        date = new Date();
+      }
+
+      const kathmanduOffsetMs = (5 * 60 + 45) * 60 * 1000;
+      const ktmDate = new Date(date.getTime() + kathmanduOffsetMs);
+
+      const pad = (num) => String(num).padStart(2, '0');
+      const yyyy = ktmDate.getUTCFullYear();
+      const mm = pad(ktmDate.getUTCMonth() + 1);
+      const dd = pad(ktmDate.getUTCDate());
+      const hh = pad(ktmDate.getUTCHours());
+      const min = pad(ktmDate.getUTCMinutes());
+      const ss = pad(ktmDate.getUTCSeconds());
+
+      return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}+05:45`;
+    };
+
+    const startTimeFormatted = getKathmanduTime(match.start_time);
+    const endTimeFormatted = getKathmanduTime(match.end_time);
+
     const payload = {
       post_id: pid,
+      team_1_name: match.team1,
+      team_1_goal: g1,
+      team_2_name: match.team2,
+      team_2_goal: g2,
+      start_time: startTimeFormatted,
+      end_time: endTimeFormatted,
       partial_match: partialMatchList,
       full_match: fullMatchList
     };
@@ -310,7 +323,7 @@ const handleCalculate = async () => {
     emit('refresh-matches');
 
     // Refresh results data
-    await fetchResultDetails(match.post_id);
+    await fetchResultDetails(pid);
     participantFilter.value = 'full'; // switch to winner view
   } catch (error) {
     const errorMsg = error.response?.data?.detail || error.message || 'Failed to calculate match outcomes';
