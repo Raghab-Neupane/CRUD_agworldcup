@@ -18,7 +18,7 @@
                 <button v-for="m in matchesWithPostId" :key="m.match_no" class="post-item-btn"
                   :class="{ active: selectedMatch?.match_no === m.match_no }" @click="selectedMatch = m">
                   Post ID: {{ m.post_id }}
-                  <span class="badge" :class="'status-' + m.status">#{{ m.match_no }}</span>
+                  <span class="description"> {{ m.team1 }} vs {{ m.team2 }}</span>
                 </button>
               </div>
             </div>
@@ -295,6 +295,18 @@ const filteredParticipants = computed(() => {
   flex-direction: column;
   gap: 10px;
 }
+
+.description {
+  display: block;
+  /* forces a line break */
+  font-size: 0.9rem;
+  /* smaller text */
+  font-weight: 400;
+  /* lighter weight */
+  margin-top: 0.3rem;
+  /* optional spacing */
+}
+
 
 .sidebar-title {
   font-size: 0.78rem;
