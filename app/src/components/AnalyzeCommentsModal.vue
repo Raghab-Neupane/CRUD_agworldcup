@@ -212,6 +212,7 @@ const fetchResultDetails = async (postId) => {
         point: p.points !== undefined ? p.points : (p.point || 0)
       }))
     };
+    hasCalculated.value = true;
   } catch (e) {
     console.error('Failed to fetch result details', e);
     resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, correct_participants: [], partial_participants: [] };
@@ -222,12 +223,14 @@ const fetchResultDetails = async (postId) => {
 
 const setCommentsFromProps = () => {
   if (props.initialComments && props.initialComments.length > 0) {
-    const specialWinnerIds = new Set(
-      (props.initialAnalyzeData?.special_winners || []).map(w => String(w.customer_id || w.commenter_id || w.user_id || w.id))
-    );
-    const partialWinnerIds = new Set(
-      (props.initialAnalyzeData?.partial_winners || []).map(w => String(w.customer_id || w.commenter_id || w.user_id || w.id))
-    );
+    const specialWinnerIds = new Set([
+      ...(props.initialAnalyzeData?.special_winners || []).map(w => String(w.customer_id || w.commenter_id || w.user_id || w.id)),
+      ...(props.initialAnalyzeData?.confirmed_special_winners || []).map(w => String(w.customer_id || w.commenter_id || w.user_id || w.id))
+    ]);
+    const partialWinnerIds = new Set([
+      ...(props.initialAnalyzeData?.partial_winners || []).map(w => String(w.customer_id || w.commenter_id || w.user_id || w.id)),
+      ...(props.initialAnalyzeData?.confirmed_partial_winners || []).map(w => String(w.customer_id || w.commenter_id || w.user_id || w.id))
+    ]);
 
     comments.value = props.initialComments.map(c => {
       const custId = String(c.customer_id || c.commenter_id || c.user_id || c.id);
@@ -373,22 +376,63 @@ const handleCalculate = async () => {
 
 const setResultsFromAnalyzeData = () => {
   if (props.initialAnalyzeData) {
+    if (props.initialAnalyzeData.resultData) {
+      const data = props.initialAnalyzeData.resultData;
+      resultDetails.value = {
+        winner_name: data.winner?.name || '',
+        winner_phone: data.winner?.mobile_number || '',
+        winner_point: data.winner?.points !== undefined ? data.winner.points : (data.winner?.point || 0),
+        correct_participants: (data.correct_participants || []).map(p => ({
+          name: p.name || p.customer_name || 'Anonymous',
+          mobile_number: p.mobile_number || '',
+          point: p.points !== undefined ? p.points : (p.point || 0)
+        })),
+        partial_participants: (data.partial_participants || []).map(p => ({
+          name: p.name || p.customer_name || 'Anonymous',
+          mobile_number: p.mobile_number || '',
+          point: p.points !== undefined ? p.points : (p.point || 0)
+        }))
+      };
+      hasCalculated.value = true;
+      return;
+    }
+
     const pWinners = props.initialAnalyzeData.partial_winners || [];
+    const cpWinners = props.initialAnalyzeData.confirmed_partial_winners || [];
     const sWinners = props.initialAnalyzeData.special_winners || [];
+    const csWinners = props.initialAnalyzeData.confirmed_special_winners || [];
+
+    const getUniqueWinners = (list1, list2) => {
+      const seen = new Set();
+      const result = [];
+      const add = (p) => {
+        const id = String(p.customer_id || p.commenter_id || p.user_id || p.id || p.mobile_number || p.name);
+        if (!seen.has(id)) {
+          seen.add(id);
+          result.push(p);
+        }
+      };
+      list1.forEach(add);
+      list2.forEach(add);
+      return result;
+    };
+
+    const combinedSWinners = getUniqueWinners(sWinners, csWinners);
+    const combinedPWinners = getUniqueWinners(pWinners, cpWinners);
 
     // Pick top winner
-    const topWinner = sWinners[0] || pWinners[0] || null;
+    const topWinner = combinedSWinners[0] || combinedPWinners[0] || null;
 
     resultDetails.value = {
       winner_name: topWinner?.name || '',
       winner_phone: topWinner?.mobile_number || '',
       winner_point: topWinner?.points !== undefined ? topWinner.points : (topWinner?.point || 0),
-      correct_participants: sWinners.map(p => ({
+      correct_participants: combinedSWinners.map(p => ({
         name: p.name || p.customer_name || 'Anonymous',
         mobile_number: p.mobile_number || '',
         point: p.points !== undefined ? p.points : (p.point || 0)
       })),
-      partial_participants: pWinners.map(p => ({
+      partial_participants: combinedPWinners.map(p => ({
         name: p.name || p.customer_name || 'Anonymous',
         mobile_number: p.mobile_number || '',
         point: p.points !== undefined ? p.points : (p.point || 0)

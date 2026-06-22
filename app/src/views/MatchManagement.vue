@@ -497,8 +497,17 @@ const handleAnalyzeMatch = async (match) => {
 
     try {
       const config = useRuntimeConfig();
-      const response = await matchService.analyze(payload, config.public.analyzeServiceUrl);
-      analyzeResponseData.value = response;
+      const [response, resultData] = await Promise.all([
+        matchService.analyze(payload, config.public.analyzeServiceUrl),
+        matchService.getResult(pid, config.public.getresultServiceUrl).catch(err => {
+          console.warn('Winner service failed during analyze:', err);
+          return null;
+        })
+      ]);
+      analyzeResponseData.value = {
+        ...response,
+        resultData
+      };
       commentsToAnalyze.value = Array.isArray(response) ? response : (response?.comments || []);
       addToast('Analyzed match details successfully.', 'success');
     } catch (apiError) {
