@@ -497,10 +497,20 @@ const handleAnalyzeMatch = async (match) => {
 
     try {
       const config = useRuntimeConfig();
-      const response = await matchService.analyze(payload, config.public.analyzeServiceUrl);
-      analyzeResponseData.value = response;
-      commentsToAnalyze.value = Array.isArray(response) ? response : (response?.comments || []);
-      addToast('Analyzed match details successfully.', 'success');
+      // Call analyze service
+      const analyzeResponse = await matchService.analyze(payload, config.public.analyzeServiceUrl);
+      // Persist analyzed status if backend indicates analysis completed
+      if (analyzeResponse.analyzed) {
+        try {
+          await matchService.updateSelectedMatch(match.match_no, { analyzed_status: true });
+          // Refresh matches to reflect new analyzed_status
+          await fetchMatches();
+        } catch (updateError) {
+          console.error('Failed to update analyzed status:', updateError);
+        }
+      }
+      // Store the analyze response data for the modal
+      analyzeResponseData.value = analyzeResponse;
     } catch (apiError) {
       console.warn('Backend analyze endpoint failed, opening comments modal anyway:', apiError);
       const errorMsg = apiError.response?.data?.detail || apiError.message || 'Failed to send analyze payload to backend';
