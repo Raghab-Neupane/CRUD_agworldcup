@@ -24,12 +24,19 @@
               <div class="winner-box">
                 <div class="winner-info-left">
                   <span class="winner-label">Winner</span>
-                  <h3 class="winner-name">{{ resultDetails.winner_name || 'No correct guess!' }}</h3>
-                  <p class="winner-phone" v-if="resultDetails.winner_name && resultDetails.winner_phone">
+                  <h3 class="winner-name">
+                    <template v-if="hasCalculated">
+                      {{ resultDetails.winner_name || 'No correct guess!' }}
+                    </template>
+                    <template v-else>
+                      Please calculate first
+                    </template>
+                  </h3>
+                  <p class="winner-phone" v-if="hasCalculated && resultDetails.winner_name && resultDetails.winner_phone">
                     📞 {{ resultDetails.winner_phone }}
                   </p>
                 </div>
-                <div class="winner-info-right" v-if="resultDetails.winner_name">
+                <div class="winner-info-right" v-if="hasCalculated && resultDetails.winner_name">
                   <span class="pts-badge winner-pts">{{ resultDetails.winner_point }} Points</span>
                 </div>
               </div>
@@ -38,8 +45,7 @@
 
               <!-- Participants/Comments Section -->
               <div class="participants-section">
-                <div v-if="loadingResult || loadingComments"
-                  style="padding: 10px; color: #64748b; font-style: italic;">
+                <div v-if="loadingResult || loadingComments" style="padding: 10px; color: #64748b; font-style: italic;">
                   Loading details...
                 </div>
                 <template v-else>
@@ -79,7 +85,6 @@
                           <td style="text-align: center;">
                             <label class="q-checkbox">
                               <input type="checkbox" v-model="c.full_match"
-                                :disabled="c.is_disabled"
                                 @change="c.full_match && (c.partial_match = false)" />
                               <span class="q-checkbox-box"></span>
                             </label>
@@ -87,7 +92,6 @@
                           <td style="text-align: center;">
                             <label class="q-checkbox">
                               <input type="checkbox" v-model="c.partial_match"
-                                :disabled="c.is_disabled"
                                 @change="c.partial_match && (c.full_match = false)" />
                               <span class="q-checkbox-box"></span>
                             </label>
@@ -111,8 +115,14 @@
                       </div>
                     </div>
                   </div>
-                  <p class="no-participants" v-else-if="participantFilter !== 'comments'">No participants found for
-                    this match type.</p>
+                  <p class="no-participants" v-else-if="participantFilter !== 'comments'">
+                    <template v-if="hasCalculated">
+                      No participants found for this match type.
+                    </template>
+                    <template v-else>
+                      Please calculate first.
+                    </template>
+                  </p>
                 </template>
               </div>
             </div>
@@ -175,6 +185,7 @@ const comments = ref([]);
 const loadingResult = ref(false);
 const loadingComments = ref(false);
 const calculating = ref(false);
+const hasCalculated = ref(false);
 
 // Filter matches that have a non-empty post_id
 const matchesWithPostId = computed(() => {
@@ -229,7 +240,7 @@ const setCommentsFromProps = () => {
         comment: c.comment || c.comment_text || c.text || '',
         full_match: isFull || !!c.full_match,
         partial_match: isPartial || !!c.partial_match,
-        is_disabled: isFull || isPartial
+        is_disabled: false
       };
     });
   } else {
@@ -265,14 +276,14 @@ const handleCalculate = async () => {
       comments.value.forEach(c => {
         const custId = c.customer_id || c.user_id || c.id;
         const commentText = c.comment || c.comment_text || c.text || '';
-        
-        if (c.full_match && !c.is_disabled) {
+
+        if (c.full_match) {
           fullMatchList.push({
             comment: commentText,
             customer_id: custId,
             points: 100
           });
-        } else if (c.partial_match && !c.is_disabled) {
+        } else if (c.partial_match) {
           partialMatchList.push({
             comment: commentText,
             customer_id: custId,
@@ -349,6 +360,7 @@ const handleCalculate = async () => {
 
     // Refresh results data
     await fetchResultDetails(pid);
+    hasCalculated.value = true;
     participantFilter.value = 'full'; // switch to winner view
   } catch (error) {
     const errorMsg = error.response?.data?.detail || error.message || 'Failed to calculate match outcomes';
@@ -362,10 +374,10 @@ const setResultsFromAnalyzeData = () => {
   if (props.initialAnalyzeData) {
     const pWinners = props.initialAnalyzeData.partial_winners || [];
     const sWinners = props.initialAnalyzeData.special_winners || [];
-    
+
     // Pick top winner
     const topWinner = sWinners[0] || pWinners[0] || null;
-    
+
     resultDetails.value = {
       winner_name: topWinner?.name || '',
       winner_phone: topWinner?.mobile_number || '',
@@ -390,6 +402,7 @@ watch(
   () => selectedMatch.value,
   (newVal) => {
     participantFilter.value = 'comments';
+    hasCalculated.value = false;
     if (newVal) {
       if (props.initialAnalyzeData) {
         setResultsFromAnalyzeData();
@@ -429,6 +442,7 @@ watch(
   () => props.show,
   (newVal) => {
     participantFilter.value = 'comments';
+    hasCalculated.value = false;
     if (newVal) {
       if (props.initialMatch && props.initialMatch.post_id && props.initialMatch.post_id.trim() !== '') {
         selectedMatch.value = props.initialMatch;
