@@ -511,6 +511,9 @@ const handleAnalyzeMatch = async (match) => {
       }
       // Store the analyze response data for the modal
       analyzeResponseData.value = analyzeResponse;
+      console.log('Full analyze response:', JSON.stringify(analyzeResponse, null, 2));
+      // Extract comments from the analyze response (try multiple possible keys)
+      commentsToAnalyze.value = analyzeResponse.comments || analyzeResponse.commenters || analyzeResponse.all_comments || analyzeResponse.data?.comments || analyzeResponse.data || [];
     } catch (apiError) {
       console.warn('Backend analyze endpoint failed, opening comments modal anyway:', apiError);
       const errorMsg = apiError.response?.data?.detail || apiError.message || 'Failed to send analyze payload to backend';
