@@ -91,7 +91,7 @@
               <input v-if="editingMatchNo === match.match_no" v-model="editForm.team_1_goal" type="number" min="0"
                 class="q-edit-input" style="max-width: 80px;" placeholder="e.g. 3" />
               <span v-else>{{ match.team_1_goal !== null && match.team_1_goal !== undefined ? match.team_1_goal : '-'
-                }}</span>
+              }}</span>
             </td>
 
             <!-- Team 2 Goal column -->
@@ -99,7 +99,7 @@
               <input v-if="editingMatchNo === match.match_no" v-model="editForm.team_2_goal" type="number" min="0"
                 class="q-edit-input" style="max-width: 80px;" placeholder="e.g. 1" />
               <span v-else>{{ match.team_2_goal !== null && match.team_2_goal !== undefined ? match.team_2_goal : '-'
-                }}</span>
+              }}</span>
             </td>
 
             <!-- Start Time column -->
@@ -128,8 +128,11 @@
                 <button class="q-btn-cancel-row" @click="cancelEditing">Cancel</button>
               </div>
               <div v-else class="actions-group">
-                <button class="q-btn-calculate" :disabled="isCalculateDisabled(match)"
-                  @click="$emit('analyze-match', match)">Analyze now</button>
+                <button v-if="!match.analyzed_status" class="q-btn-analyze"
+                  @click="$emit('analyze-match', match)">Analyze
+                  now</button>
+                <button v-else class="q-btn-calculate" :disabled="isCalculateDisabled(match)"
+                  @click="$emit('calculate-match', match)">Calculate</button>
                 <button class="q-btn-edit-row" @click="startEditing(match)">Edit</button>
                 <button class="q-btn-delete" @click="$emit('request-delete', match.match_no)">Delete</button>
               </div>
@@ -189,7 +192,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['request-delete', 'update-status', 'update-match', 'calculate-match', 'show-toast', 'refresh-matches']);
+const emit = defineEmits(['request-delete', 'update-status', 'update-match', 'calculate-match', 'analyze-match', 'show-toast', 'refresh-matches']);
 
 // New state for selected match toggle
 const selectedMatchId = ref(null);
@@ -825,6 +828,22 @@ const saveRow = (match) => {
   color: #7f8c8d;
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+.q-btn-analyze {
+  background: #1f820d;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.q-btn-analyze:hover {
+  background: #e65100;
 }
 
 .q-btn-save-row {
