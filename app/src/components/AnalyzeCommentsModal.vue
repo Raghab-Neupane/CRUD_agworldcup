@@ -146,6 +146,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import matchService from '../services/matchService';
+import { normalizeCountry } from '../utils/countryNormalizer';
 
 const props = defineProps({
   show: {
@@ -328,9 +329,9 @@ const handleCalculate = async () => {
 
     const payload = {
       post_id: pid,
-      team_1_name: match.team1,
+      team_1_name: normalizeCountry(match.team1),
       team_1_goal: g1,
-      team_2_name: match.team2,
+      team_2_name: normalizeCountry(match.team2),
       team_2_goal: g2,
       start_time: startTimeFormatted,
       end_time: endTimeFormatted,

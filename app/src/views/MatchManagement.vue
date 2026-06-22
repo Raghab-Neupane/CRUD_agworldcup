@@ -90,6 +90,7 @@ import MatchTable from '../components/MatchTable.vue';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
 import ViewResultsModal from '../components/ViewResultsModal.vue';
 import AnalyzeCommentsModal from '../components/AnalyzeCommentsModal.vue';
+import { normalizeCountry } from '../utils/countryNormalizer';
 
 // State variables
 const matches = ref([]);
@@ -392,9 +393,9 @@ const handleCalculateMatch = async (match) => {
 
     const payload = {
       post_id: pid,
-      team_1_name: match.team1,
+      team_1_name: normalizeCountry(match.team1),
       team_1_goal: g1,
-      team_2_name: match.team2,
+      team_2_name: normalizeCountry(match.team2),
       team_2_goal: g2,
       start_time: startTimeFormatted,
       end_time: endTimeFormatted
@@ -486,9 +487,9 @@ const handleAnalyzeMatch = async (match) => {
 
     const payload = {
       post_id: pid,
-      team_1_name: match.team1,
+      team_1_name: normalizeCountry(match.team1),
       team_1_goal: g1,
-      team_2_name: match.team2,
+      team_2_name: normalizeCountry(match.team2),
       team_2_goal: g2,
       start_time: startTimeFormatted,
       end_time: endTimeFormatted
