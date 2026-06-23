@@ -18,7 +18,7 @@
                 <button v-for="m in matchesWithPostId" :key="m.match_no" class="post-item-btn"
                   :class="{ active: selectedMatch?.match_no === m.match_no }" @click="selectedMatch = m">
                   Post ID: {{ m.post_id }}
-                  <span class="badge" :class="'status-' + m.status">#{{ m.match_no }}</span>
+                  <span class="description"> {{ m.team1 }} vs {{ m.team2 }}</span>
                 </button>
               </div>
             </div>
@@ -35,7 +35,7 @@
                 <div class="winner-box">
                   <div class="winner-info-left">
                     <span class="winner-label">Winner</span>
-                    <h3 class="winner-name">{{ resultDetails.winner_name || 'Not Decided yet' }}</h3>
+                    <h3 class="winner-name">{{ resultDetails.winner_name || 'No correct guess!' }}</h3>
                     <p class="winner-phone" v-if="resultDetails.winner_name && resultDetails.winner_phone">
                       📞 {{ resultDetails.winner_phone }}
                     </p>
@@ -53,20 +53,32 @@
                     Loading results...
                   </div>
                   <template v-else>
-                    <h5>Participants ({{ participantsList.length }})</h5>
-                    <div class="participants-table-list" v-if="participantsList.length">
-                      <div v-for="(p, idx) in participantsList" :key="idx" class="participant-table-row">
+                    <!-- Horizontal Tabs Switch -->
+                    <div class="results-tabs">
+                      <button class="tab-btn" :class="{ active: participantFilter === 'full' }"
+                        @click="participantFilter = 'full'">
+                        Full Match ({{ (resultDetails.correct_participants || []).length }})
+                      </button>
+                      <button class="tab-btn" :class="{ active: participantFilter === 'partial' }"
+                        @click="participantFilter = 'partial'">
+                        Partial Match ({{ (resultDetails.partial_participants || []).length }})
+                      </button>
+                    </div>
+
+                    <!-- Participants List -->
+                    <div class="participants-table-list" v-if="filteredParticipants.length">
+                      <div v-for="(p, idx) in filteredParticipants" :key="idx" class="participant-table-row">
                         <div class="p-info">
                           <span class="p-index">{{ idx + 1 }}</span>
                           <span class="p-name-bold">{{ p.name }}</span>
                           <span class="p-phone-light" v-if="p.mobile_number">({{ p.mobile_number }})</span>
                         </div>
                         <div class="p-points">
-                          <span class="pts-badge participant-pts">{{ p.point }} Points</span>
+                          <span class="pts-badge participant-pts">{{ p.point || 0 }} Points</span>
                         </div>
                       </div>
                     </div>
-                    <p class="no-participants" v-else>No participants listed for this match.</p>
+                    <p class="no-participants" v-else>No participants found for this match type.</p>
                   </template>
                 </div>
               </div>
@@ -81,7 +93,6 @@
         </div>
 
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="$emit('close')">Close</button>
         </div>
       </div>
     </div>
@@ -106,12 +117,13 @@ const props = defineProps({
 defineEmits(['close']);
 
 const selectedMatch = ref(null);
+const participantFilter = ref('full');
 const resultDetails = ref({
   winner_name: '',
   winner_phone: '',
   winner_point: 0,
-  participants: '',
-  participants_list: []
+  correct_participants: [],
+  partial_participants: []
 });
 const loadingResult = ref(false);
 
@@ -120,20 +132,7 @@ const matchesWithPostId = computed(() => {
   return props.matches.filter(m => m.post_id && m.post_id.trim() !== '');
 });
 
-// TODO: Replace the static JSON import with an environment variable pointing to the result endpoint.
-// const fetchData = ... (remove this line when using the real API)
-// Removed static fetchData import; fetching results from API
-
 // Fetches result details from the backend endpoint defined in an environment variable.
-// Replace the dummy implementation below with a call to the API, e.g.:
-// const fetchResultDetails = async (postId) => {
-//   const endpoint = import.meta.env.VITE_RESULT_ENDPOINT; // adjust as needed
-//   const res = await fetch(`${endpoint}/${postId}`);
-//   const data = await res.json();
-//   resultDetails.value = {
-//     winner_name: data.winner?.name || '',
-//     winner_phone: data.winner?.mobile_number || '',
-//     winner_point: data.winner?.point || 0,
 const fetchResultDetails = async (postId) => {
   loadingResult.value = true;
   try {
@@ -143,15 +142,18 @@ const fetchResultDetails = async (postId) => {
       winner_name: data.winner?.name || '',
       winner_phone: data.winner?.mobile_number || '',
       winner_point: data.winner?.points !== undefined ? data.winner.points : (data.winner?.point || 0),
-      participants: '',
-      participants_list: (data.participants || []).map(p => ({
+      correct_participants: (data.correct_participants || []).map(p => ({
+        ...p,
+        point: p.points !== undefined ? p.points : (p.point || 0)
+      })),
+      partial_participants: (data.partial_participants || []).map(p => ({
         ...p,
         point: p.points !== undefined ? p.points : (p.point || 0)
       }))
     };
   } catch (e) {
     console.error('Failed to fetch result details', e);
-    resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '', participants_list: [] };
+    resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, correct_participants: [], partial_participants: [] };
   } finally {
     loadingResult.value = false;
   }
@@ -161,10 +163,11 @@ const fetchResultDetails = async (postId) => {
 watch(
   () => selectedMatch.value,
   (newVal) => {
+    participantFilter.value = 'full';
     if (newVal) {
       fetchResultDetails(newVal.post_id);
     } else {
-      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '' };
+      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, correct_participants: [], partial_participants: [] };
     }
   }
 );
@@ -173,27 +176,41 @@ watch(
 watch(
   () => props.show,
   (newVal) => {
+    participantFilter.value = 'full';
     if (newVal && matchesWithPostId.value.length) {
       selectedMatch.value = matchesWithPostId.value[0];
     } else if (!newVal) {
       selectedMatch.value = null;
-      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, participants: '' };
+      resultDetails.value = { winner_name: '', winner_phone: '', winner_point: 0, correct_participants: [], partial_participants: [] };
     }
   },
   { immediate: true }
 );
 
-// Split comma-separated participants string into an array of objects
-const participantsList = computed(() => {
-  if (resultDetails.value.participants_list && resultDetails.value.participants_list.length > 0) {
-    return resultDetails.value.participants_list;
+// Computed property to check if the match has been calculated
+const isCalculated = computed(() => {
+  if (!selectedMatch.value) return false;
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('calculatedMatches');
+      if (stored) {
+        const list = JSON.parse(stored);
+        return Array.isArray(list) && list.includes(selectedMatch.value.match_no);
+      }
+    } catch (e) {
+      console.error('Failed to read calculatedMatches from localStorage:', e);
+    }
   }
-  if (!resultDetails.value.participants) return [];
-  return resultDetails.value.participants
-    .split(',')
-    .map(p => p.trim())
-    .filter(p => p.length > 0)
-    .map(name => ({ name, phone: '' }));
+  return false;
+});
+
+// Filter participants by match type (Full Match vs Partial Match)
+const filteredParticipants = computed(() => {
+  if (participantFilter.value === 'full') {
+    return resultDetails.value.correct_participants || [];
+  } else {
+    return resultDetails.value.partial_participants || [];
+  }
 });
 </script>
 
@@ -216,11 +233,12 @@ const participantsList = computed(() => {
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   width: 95%;
-  max-width: 850px;
+  max-width: 1050px;
+  height: 85vh;
   padding: 24px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   color: #1e293b;
-  max-height: 85vh;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
 }
@@ -257,7 +275,7 @@ const participantsList = computed(() => {
 }
 
 .modal-body {
-  margin-bottom: 20px;
+  margin-bottom: 0;
   overflow-y: auto;
   flex-grow: 1;
 }
@@ -267,7 +285,7 @@ const participantsList = computed(() => {
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: 20px;
-  min-height: 350px;
+  height: 100%;
 }
 
 .post-id-sidebar {
@@ -277,6 +295,18 @@ const participantsList = computed(() => {
   flex-direction: column;
   gap: 10px;
 }
+
+.description {
+  display: block;
+  /* forces a line break */
+  font-size: 0.9rem;
+  /* smaller text */
+  font-weight: 400;
+  /* lighter weight */
+  margin-top: 0.3rem;
+  /* optional spacing */
+}
+
 
 .sidebar-title {
   font-size: 0.78rem;
@@ -292,7 +322,26 @@ const participantsList = computed(() => {
   flex-direction: column;
   gap: 6px;
   overflow-y: auto;
-  max-height: 320px;
+  max-height: 60vh;
+  padding-right: 4px;
+}
+
+.post-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.post-list::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.post-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.post-list::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .post-item-btn {
@@ -374,7 +423,7 @@ const participantsList = computed(() => {
   justify-content: space-between;
   align-items: center;
 }
- 
+
 .winner-info-left {
   display: flex;
   flex-direction: column;
@@ -384,7 +433,7 @@ const participantsList = computed(() => {
   display: flex;
   align-items: center;
 }
- 
+
 .winner-label {
   font-size: 0.75rem;
   font-weight: 700;
@@ -393,14 +442,14 @@ const participantsList = computed(() => {
   letter-spacing: 0.05em;
   margin-bottom: 2px;
 }
- 
+
 .winner-name {
   margin: 0 0 2px 0;
   font-size: 1.2rem;
   font-weight: 700;
   color: #0f172a;
 }
- 
+
 .winner-phone {
   margin: 0;
   font-size: 0.85rem;
@@ -434,7 +483,7 @@ const participantsList = computed(() => {
   background: #e2e8f0;
   margin: 16px 0;
 }
- 
+
 .participants-section h5 {
   margin: 0 0 10px 0;
   font-size: 0.95rem;
@@ -443,16 +492,16 @@ const participantsList = computed(() => {
   border-bottom: 1px solid #f1f5f9;
   padding-bottom: 6px;
 }
- 
+
 .participants-table-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 220px;
+  max-height: 420px;
   overflow-y: auto;
   padding: 2px;
 }
- 
+
 .participant-table-row {
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
@@ -532,6 +581,35 @@ const participantsList = computed(() => {
 .modal-fade-enter-from,
 .modal-fade-leave-to {
   opacity: 0;
+}
+
+.results-tabs {
+  display: flex;
+  gap: 12px;
+  border-bottom: 2px solid #e2e8f0;
+  margin-bottom: 16px;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+  color: #1e293b;
+}
+
+.tab-btn.active {
+  color: #1976d2;
+  border-bottom-color: #1976d2;
 }
 
 @media (max-width: 580px) {

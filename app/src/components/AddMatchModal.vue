@@ -10,6 +10,17 @@
         </div>
 
 
+        <!-- Tabs for Single vs Bulk Add -->
+        <div class="modal-tabs">
+          <button type="button" class="tab-btn" :class="{ active: activeTab === 'single' }"
+            @click="activeTab = 'single'">
+            Single Match
+          </button>
+          <button type="button" class="tab-btn" :class="{ active: activeTab === 'bulk' }" @click="activeTab = 'bulk'">
+            Bulk Insert
+          </button>
+        </div>
+
         <form v-if="activeTab === 'single'" @submit.prevent="handleSubmit" class="modal-form">
           <div v-if="errorMsg" class="form-error-alert">
             <span class="alert-text">{{ errorMsg }}</span>
@@ -33,6 +44,11 @@
                 <option value="Group F">Group F</option>
                 <option value="Group G">Group G</option>
                 <option value="Group H">Group H</option>
+                <option value="Group H">Group I</option>
+                <option value="Group H">Group J</option>
+                <option value="Group H">Group K</option>
+                <option value="Group H">Group L</option>
+                <option value="Round of 32">Round of 32</option>
                 <option value="Round of 16">Round of 16</option>
                 <option value="Quarter-finals">Quarter-finals</option>
                 <option value="Semi-finals">Semi-finals</option>

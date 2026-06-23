@@ -9,12 +9,7 @@
     <!-- Toast Notifications -->
     <div class="toast-container">
       <TransitionGroup name="toast">
-        <div
-          v-for="toast in toasts"
-          :key="toast.id"
-          class="toast"
-          :class="'toast-' + toast.type"
-        >
+        <div v-for="toast in toasts" :key="toast.id" class="toast" :class="'toast-' + toast.type">
           <span class="toast-icon">{{ toast.type === 'success' ? '✓' : '⚠️' }}</span>
           <span class="toast-message">{{ toast.message }}</span>
           <button class="toast-close" @click="removeToast(toast.id)">&times;</button>
@@ -41,6 +36,9 @@
         <button class="btn-logout" @click="handleLogout" title="Sign Out">
           Sign Out
         </button>
+        <button class="btn-present" @click="handlePresent" title="Mark as Present">
+          Present
+        </button>
       </div>
     </header>
 
@@ -49,13 +47,8 @@
       <!-- Status Tabs / Filter Pills -->
       <div class="filter-tabs-container">
         <div class="tabs-list">
-          <button
-            v-for="tab in filterTabs"
-            :key="tab.value"
-            class="tab-pill"
-            :class="{ active: activeStatusFilter === tab.value }"
-            @click="activeStatusFilter = tab.value"
-          >
+          <button v-for="tab in filterTabs" :key="tab.value" class="tab-pill"
+            :class="{ active: activeStatusFilter === tab.value }" @click="activeStatusFilter = tab.value">
             {{ tab.label }}
             <span class="tab-count">{{ tab.count }}</span>
           </button>
@@ -64,42 +57,28 @@
 
       <!-- Match Visual Dashboard Grid -->
       <section class="content-main">
-        <MatchTable
-          :matches="matches"
-          :active-status-filter="activeStatusFilter"
-          :calculated-match-nos="calculatedMatchNos"
-          @request-delete="triggerDeleteConfirmation"
-          @update-status="handleUpdateStatus"
-          @update-match="handleUpdateMatch"
-          @calculate-match="handleCalculateMatch"
-          @show-toast="e => addToast(e.message, e.type)"
-        />
+        <MatchTable :matches="matches" :active-status-filter="activeStatusFilter"
+          :calculated-match-nos="calculatedMatchNos" @request-delete="triggerDeleteConfirmation"
+          @update-status="handleUpdateStatus" @update-match="handleUpdateMatch" @calculate-match="handleCalculateMatch"
+          @analyze-match="handleAnalyzeMatch"
+          @show-toast="e => addToast(e.message, e.type)" @refresh-matches="fetchMatches" />
       </section>
     </main>
 
     <!-- Add Match Modal -->
-    <AddMatchModal
-      :show="showAddModal"
-      :loading="modalActionLoading"
-      @confirm="handleConfirmAdd"
-      @bulk-confirm="handleConfirmBulkAdd"
-      @cancel="showAddModal = false"
-    />
+    <AddMatchModal :show="showAddModal" :loading="modalActionLoading" @confirm="handleConfirmAdd"
+      @bulk-confirm="handleConfirmBulkAdd" @cancel="showAddModal = false" />
 
     <!-- Confirmation Modal for Deletion -->
-    <ConfirmDeleteModal
-      :show="showDeleteModal"
-      :match-no="matchToDelete"
-      @confirm="handleConfirmDelete"
-      @cancel="closeDeleteModal"
-    />
+    <ConfirmDeleteModal :show="showDeleteModal" :match-no="matchToDelete" @confirm="handleConfirmDelete"
+      @cancel="closeDeleteModal" />
 
     <!-- View Results Modal -->
-    <ViewResultsModal
-      :show="showResultsModal"
-      :matches="matches"
-      @close="showResultsModal = false"
-    />
+    <ViewResultsModal :show="showResultsModal" :matches="matches" @close="showResultsModal = false" />
+
+    <!-- Analyze Comments Modal -->
+    <AnalyzeCommentsModal :show="showAnalyzeModal" :matches="matches" :initial-match="matchToAnalyze" :initial-comments="commentsToAnalyze" :initial-analyze-data="analyzeResponseData"
+      @close="showAnalyzeModal = false" @show-toast="e => addToast(e.message, e.type)" @refresh-matches="fetchMatches" />
   </div>
 </template>
 
@@ -110,6 +89,8 @@ import AddMatchModal from '../components/AddMatchModal.vue';
 import MatchTable from '../components/MatchTable.vue';
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal.vue';
 import ViewResultsModal from '../components/ViewResultsModal.vue';
+import AnalyzeCommentsModal from '../components/AnalyzeCommentsModal.vue';
+import { normalizeCountry } from '../utils/countryNormalizer';
 
 // State variables
 const matches = ref([]);
@@ -118,6 +99,10 @@ const modalActionLoading = ref(false);
 const toasts = ref([]);
 const activeStatusFilter = ref('all');
 const calculatedMatchNos = ref([]);
+const showAnalyzeModal = ref(false);
+const matchToAnalyze = ref(null);
+const commentsToAnalyze = ref([]);
+const analyzeResponseData = ref(null);
 
 const loadCalculatedMatches = () => {
   if (typeof window !== 'undefined') {
@@ -179,6 +164,10 @@ const handleLogout = () => {
   const authCookie = useCookie('isAuthenticated');
   authCookie.value = null;
   navigateTo('/login');
+};
+
+const handlePresent = () => {
+  window.open('https://worldcup.ambition.guru/', '_blank');
 };
 
 // API operations
@@ -283,14 +272,14 @@ const handleConfirmBulkAdd = async (matchesList) => {
 
   showAddModal.value = false;
   modalActionLoading.value = false;
-  
+
   if (insertedCount > 0) {
     addToast(`Successfully bulk inserted ${insertedCount} matches!`, 'success');
   }
   if (failedCount > 0) {
     addToast(`Failed to insert ${failedCount} matches. Error: ${lastError}`, 'error');
   }
-  
+
   await fetchMatches();
 };
 
@@ -335,6 +324,28 @@ const handleUpdateMatch = async ({ matchNo, updatedData }) => {
 const handleCalculateMatch = async (match) => {
   loading.value = true;
   try {
+    // Validate all fields are filled
+    const requiredFields = [
+      { key: 'stage', name: 'Stage' },
+      { key: 'team1', name: 'Team 1' },
+      { key: 'team2', name: 'Team 2' },
+      { key: 'post_id', name: 'Post ID' },
+      { key: 'team_1_goal', name: 'Team 1 Goal' },
+      { key: 'team_2_goal', name: 'Team 2 Goal' },
+      { key: 'start_time', name: 'Start Time' },
+      { key: 'end_time', name: 'End Time' }
+    ];
+
+    const emptyFields = requiredFields.filter(f => {
+      const val = match[f.key];
+      return val === null || val === undefined || String(val).trim() === '';
+    });
+
+    if (emptyFields.length > 0) {
+      const fieldNames = emptyFields.map(f => f.name).join(', ');
+      throw new Error(`All fields must be filled. Missing: ${fieldNames}`);
+    }
+
     const g1 = match.team_1_goal !== null && match.team_1_goal !== undefined && match.team_1_goal !== '' ? parseInt(match.team_1_goal, 10) : 0;
     const g2 = match.team_2_goal !== null && match.team_2_goal !== undefined && match.team_2_goal !== '' ? parseInt(match.team_2_goal, 10) : 0;
 
@@ -344,7 +355,7 @@ const handleCalculateMatch = async (match) => {
       if (!isNaN(parsed)) {
         pid = parsed;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const getKathmanduTime = (dateInput) => {
       let date;
@@ -382,9 +393,9 @@ const handleCalculateMatch = async (match) => {
 
     const payload = {
       post_id: pid,
-      team_1_name: match.team1,
+      team_1_name: normalizeCountry(match.team1),
       team_1_goal: g1,
-      team_2_name: match.team2,
+      team_2_name: normalizeCountry(match.team2),
       team_2_goal: g2,
       start_time: startTimeFormatted,
       end_time: endTimeFormatted
@@ -405,6 +416,118 @@ const handleCalculateMatch = async (match) => {
 };
 
 // Delete actions
+const handleAnalyzeMatch = async (match) => {
+  loading.value = true;
+  try {
+    // Validate all fields are filled
+    const requiredFields = [
+      { key: 'stage', name: 'Stage' },
+      { key: 'team1', name: 'Team 1' },
+      { key: 'team2', name: 'Team 2' },
+      { key: 'post_id', name: 'Post ID' },
+      { key: 'team_1_goal', name: 'Team 1 Goal' },
+      { key: 'team_2_goal', name: 'Team 2 Goal' },
+      { key: 'start_time', name: 'Start Time' },
+      { key: 'end_time', name: 'End Time' }
+    ];
+
+    const emptyFields = requiredFields.filter(f => {
+      const val = match[f.key];
+      return val === null || val === undefined || String(val).trim() === '';
+    });
+
+    if (emptyFields.length > 0) {
+      const fieldNames = emptyFields.map(f => f.name).join(', ');
+      throw new Error(`All fields must be filled. Missing: ${fieldNames}`);
+    }
+
+    const g1 = match.team_1_goal !== null && match.team_1_goal !== undefined && match.team_1_goal !== '' ? parseInt(match.team_1_goal, 10) : 0;
+    const g2 = match.team_2_goal !== null && match.team_2_goal !== undefined && match.team_2_goal !== '' ? parseInt(match.team_2_goal, 10) : 0;
+
+    let pid = match.post_id || match.match_no;
+    try {
+      const parsed = parseInt(pid, 10);
+      if (!isNaN(parsed)) {
+        pid = parsed;
+      }
+    } catch (e) { }
+
+    const getKathmanduTime = (dateInput) => {
+      let date;
+      if (!dateInput) {
+        date = new Date();
+      } else {
+        let str = String(dateInput).trim();
+        if (str.includes(' ')) {
+          str = str.replace(' ', 'T');
+        }
+        date = new Date(str);
+      }
+
+      if (isNaN(date.getTime())) {
+        date = new Date();
+      }
+
+      const kathmanduOffsetMs = (5 * 60 + 45) * 60 * 1000;
+      const ktmDate = new Date(date.getTime() + kathmanduOffsetMs);
+
+      const pad = (num) => String(num).padStart(2, '0');
+      const yyyy = ktmDate.getUTCFullYear();
+      const mm = pad(ktmDate.getUTCMonth() + 1);
+      const dd = pad(ktmDate.getUTCDate());
+      const hh = pad(ktmDate.getUTCHours());
+      const min = pad(ktmDate.getUTCMinutes());
+      const ss = pad(ktmDate.getUTCSeconds());
+
+      return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}+05:45`;
+    };
+
+    const startTimeFormatted = getKathmanduTime(match.start_time);
+    const endTimeFormatted = getKathmanduTime(match.end_time);
+
+    const payload = {
+      post_id: pid,
+      team_1_name: normalizeCountry(match.team1),
+      team_1_goal: g1,
+      team_2_name: normalizeCountry(match.team2),
+      team_2_goal: g2,
+      start_time: startTimeFormatted,
+      end_time: endTimeFormatted
+    };
+
+    try {
+      const config = useRuntimeConfig();
+      const [response, resultData] = await Promise.all([
+        matchService.analyze(payload, config.public.analyzeServiceUrl),
+        matchService.getResult(pid, config.public.getresultServiceUrl).catch(err => {
+          console.warn('Winner service failed during analyze:', err);
+          return null;
+        })
+      ]);
+      analyzeResponseData.value = {
+        ...response,
+        resultData
+      };
+      commentsToAnalyze.value = Array.isArray(response) ? response : (response?.comments || []);
+      addToast('Analyzed match details successfully.', 'success');
+    } catch (apiError) {
+      console.warn('Backend analyze endpoint failed, opening comments modal anyway:', apiError);
+      const errorMsg = apiError.response?.data?.detail || apiError.message || 'Failed to send analyze payload to backend';
+      addToast(errorMsg + ' (Opened modal anyway)', 'error');
+      commentsToAnalyze.value = [];
+      analyzeResponseData.value = null;
+    }
+
+    matchToAnalyze.value = match;
+    showAnalyzeModal.value = true;
+  } catch (error) {
+    const errorMsg = error.message || 'Failed to initiate analyze';
+    addToast(errorMsg, 'error');
+  } finally {
+    loading.value = false;
+  }
+};
+
 const triggerDeleteConfirmation = (matchNo) => {
   matchToDelete.value = matchNo;
   showDeleteModal.value = true;
@@ -494,7 +617,8 @@ body {
 }
 
 .btn-primary {
-  background: #1976d2; /* Quasar Blue primary color */
+  background: #1976d2;
+  /* Quasar Blue primary color */
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -556,6 +680,7 @@ body {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 .btn-logout {
   background: #ef4444;
   color: #ffffff;
@@ -571,6 +696,23 @@ body {
 .btn-logout:hover {
   background: #dc2626;
 }
+
+.btn-present {
+  background: #4e3b6e;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-present:hover {
+  background: #3d28f5;
+}
+
 /* Main Dashboard content */
 .dashboard-content {
   display: flex;
@@ -745,6 +887,8 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

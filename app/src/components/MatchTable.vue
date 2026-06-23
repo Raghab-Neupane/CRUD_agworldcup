@@ -129,7 +129,7 @@
               </div>
               <div v-else class="actions-group">
                 <button class="q-btn-calculate" :disabled="isCalculateDisabled(match)"
-                  @click="$emit('calculate-match', match)">Calculate</button>
+                  @click="$emit('analyze-match', match)">Analyze now</button>
                 <button class="q-btn-edit-row" @click="startEditing(match)">Edit</button>
                 <button class="q-btn-delete" @click="$emit('request-delete', match.match_no)">Delete</button>
               </div>
@@ -189,7 +189,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['request-delete', 'update-status', 'update-match', 'calculate-match', 'show-toast']);
+const emit = defineEmits(['request-delete', 'update-status', 'update-match', 'calculate-match', 'show-toast', 'refresh-matches']);
 
 // New state for selected match toggle
 const selectedMatchId = ref(null);
@@ -198,6 +198,8 @@ watch(() => props.matches, (newMatches) => {
   const selected = newMatches.find(m => m.is_selected);
   if (selected) {
     selectedMatchId.value = selected.match_no;
+  } else {
+    selectedMatchId.value = null;
   }
 }, { immediate: true, deep: true });
 
@@ -207,8 +209,9 @@ const toggleSelect = async (match) => {
     // Deselect current match
     selectedMatchId.value = null;
     try {
-      await matchService.updateSelectedMatch(match.match_no, { winner: null, phone: null });
+      await matchService.updateSelectedMatch(null, { winner: null, phone: null });
       emit('show-toast', { message: `Deselected Match #${match.match_no}.`, type: 'info' });
+      emit('refresh-matches');
     } catch (e) {
       console.error('Failed to deselect match', e);
     }
@@ -218,6 +221,7 @@ const toggleSelect = async (match) => {
     try {
       await matchService.updateSelectedMatch(match.match_no, { winner: match.winner, phone: match.phone });
       emit('show-toast', { message: `Selected Match #${match.match_no} as active match!`, type: 'success' });
+      emit('refresh-matches');
     } catch (e) {
       console.error('Failed to update selected match', e);
     }
@@ -367,8 +371,7 @@ const getTeam2Goal = (goalDiff) => {
 };
 
 const isCalculateDisabled = (match) => {
-  if (props.calculatedMatchNos.includes(match.match_no)) return true;
-  if (!match.end_time) return true;
+  if (!match.end_time) return false;
 
   let endStr = String(match.end_time).trim();
   if (endStr.includes(' ')) {
@@ -380,7 +383,7 @@ const isCalculateDisabled = (match) => {
   }
 
   const endTime = new Date(endStr);
-  if (isNaN(endTime.getTime())) return true;
+  if (isNaN(endTime.getTime())) return false;
 
   return endTime > new Date();
 };
